@@ -2,12 +2,14 @@
 
 ## Overview
 
-UPC provides four contract layers:
+UPC provides six contract layers:
 
 1. **`IAttestationVerifier`** — Standard interface for any attestation verifier
 2. **`AttestationHub`** — On-chain registry of verifiers
 3. **`ASPRegistryHub`** — Merkle root registry for ASP operators
-4. **`MerkleASPVerifier`** — Adapter that wraps ASPRegistryHub as an IAttestationVerifier
+4. **`BLS12381`** — Library wrapping EIP-2537 precompiles for BLS12-381 curve operations
+5. **`PlonkVerifierBLS12381`** — PLONK proof verification using EIP-2537 precompiles (128-bit security)
+6. **Verifier adapters** — `MerkleASPVerifier`, `PlonkMembershipVerifier`, `SemaphoreVerifier`
 
 ## IAttestationVerifier
 
@@ -68,6 +70,47 @@ contract MerkleASPVerifier is IAttestationVerifier {
         (uint256 aspId, uint256 root) = abi.decode(proof, (uint256, uint256));
         return aspHub.isValidASPRoot(aspId, root);
     }
+}
+```
+
+## BLS12381 Library
+
+Wraps EIP-2537 precompiles (live since Pectra, May 2025) for BLS12-381 curve operations:
+
+```solidity
+library BLS12381 {
+    function g1Add(bytes memory p1, bytes memory p2) → bytes memory     // 375 gas
+    function g1Mul(bytes memory point, uint256 scalar) → bytes memory   // ~12,000 gas
+    function g1Msm(bytes[] memory points, uint256[] memory scalars) → bytes memory
+    function pairingCheck(bytes[] memory g1, bytes[] memory g2) → bool  // ~103,000 gas (2 pairs)
+    function g1Negate(bytes memory point) → bytes memory
+}
+```
+
+Field elements are 64 bytes BigEndian (top 16 bytes zero). G1 points are 128 bytes, G2 points are 256 bytes, scalars are 32 bytes.
+
+## PlonkVerifierBLS12381
+
+PLONK proof verifier using the BLS12381 library. Takes a circuit-specific verification key as constructor parameter — reusable across any PLONK circuit compiled for BLS12-381.
+
+```solidity
+contract PlonkVerifierBLS12381 {
+    constructor(VerificationKey memory _vk);
+    function verifyProof(Proof calldata proof, uint256[] calldata pubSignals) → bool;
+}
+```
+
+Gas estimate: ~200-250k per verification.
+
+## PlonkMembershipVerifier
+
+`IAttestationVerifier` adapter that verifies PLONK membership proofs on-chain. Wraps `PlonkVerifierBLS12381` and checks that the public signals match the claimed identity.
+
+```solidity
+contract PlonkMembershipVerifier is IAttestationVerifier {
+    function verify(uint256 identity, bytes calldata proof) → bool;
+    // proof = abi.encode(PlonkProof, uint256[] pubSignals)
+    // pubSignals[0] = identity, pubSignals[1] = attestationRoot
 }
 ```
 
