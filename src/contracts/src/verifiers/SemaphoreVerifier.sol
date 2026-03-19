@@ -3,14 +3,29 @@ pragma solidity ^0.8.20;
 
 import "../../interfaces/IAttestationVerifier.sol";
 
+/// @notice Minimal interface for Semaphore v4's verifyProof
+/// @dev Full interface at: https://github.com/semaphore-protocol/semaphore
+interface ISemaphore {
+    struct SemaphoreProof {
+        uint256 merkleTreeDepth;
+        uint256 merkleTreeRoot;
+        uint256 nullifier;
+        uint256 message;
+        uint256 scope;
+        uint256[8] points;
+    }
+
+    function verifyProof(
+        uint256 groupId,
+        SemaphoreProof calldata proof
+    ) external view returns (bool);
+}
+
 /// @title SemaphoreVerifier (Skeleton)
 /// @notice Adapter that wraps Semaphore's verifyProof() as an IAttestationVerifier.
 ///
 ///         This is a skeleton — to deploy, provide the actual Semaphore contract address.
 ///         The Semaphore protocol must be deployed separately.
-///
-///         Proof format: abi.encode(SemaphoreProof)
-///         where SemaphoreProof matches Semaphore v4's proof struct.
 ///
 /// @dev To use this adapter:
 ///      1. Deploy Semaphore v4 contracts
@@ -18,24 +33,6 @@ import "../../interfaces/IAttestationVerifier.sol";
 ///      3. Deploy this adapter with the Semaphore address and group ID
 ///      4. Register this adapter with AttestationHub
 contract SemaphoreVerifier is IAttestationVerifier {
-    /// @notice Minimal interface for Semaphore's verifyProof
-    /// @dev Full interface at: https://github.com/semaphore-protocol/semaphore
-    interface ISemaphore {
-        struct SemaphoreProof {
-            uint256 merkleTreeDepth;
-            uint256 merkleTreeRoot;
-            uint256 nullifier;
-            uint256 message;
-            uint256 scope;
-            uint256[8] points;
-        }
-
-        function verifyProof(
-            uint256 groupId,
-            SemaphoreProof calldata proof
-        ) external view returns (bool);
-    }
-
     ISemaphore public immutable semaphore;
     uint256 public immutable groupId;
 
