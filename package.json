@@ -76,7 +76,8 @@
     }
   },
   "dependencies": {
-    "circomlibjs": "^0.1.7"
+    "circomlibjs": "^0.1.7",
+    "poseidon-bls12381": "^1.0.2"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

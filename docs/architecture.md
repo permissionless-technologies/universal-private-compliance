@@ -78,6 +78,47 @@ interface IAttestationVerifier {
 }
 ```
 
+## Pluggable Hash Functions
+
+The SDK uses a pluggable hash interface (`IHashFunction`) for all Merkle tree operations. This allows switching between different elliptic curves based on security requirements.
+
+```typescript
+interface IHashFunction {
+  hash2(left: bigint, right: bigint): Promise<bigint>
+  hashN(inputs: bigint[]): Promise<bigint>
+  readonly fieldPrime: bigint
+  readonly name: string
+  readonly securityBits: number
+}
+```
+
+### Built-in Implementations
+
+| Implementation | Curve | Security | Status |
+|---------------|-------|----------|--------|
+| `PoseidonBLS12381` | BLS12-381 | 128-bit | **Default** |
+| `PoseidonBN254` | BN254 | ~100-bit | Legacy/opt-in |
+
+### Why BLS12-381?
+
+BN254 (alt_bn128) was originally estimated at 128-bit security, but the Kim-Barbulescu attack (2016) reduced it to ~100 bits. This is below the 128-bit threshold required by institutional audits and NIST recommendations.
+
+BLS12-381 provides proper 128-bit security and is now gas-efficient on Ethereum since EIP-2537 precompiles went live with Pectra (May 2025).
+
+### Using BN254 (opt-in)
+
+```typescript
+import { MerkleTree, PoseidonBN254 } from '@permissionless-technologies/universal-private-compliance'
+
+const tree = new MerkleTree(20, new PoseidonBN254())
+```
+
+### Circuit Variants
+
+Circuits are provided for both curves:
+- `src/circuits/bls12381/` — compile with `circom ... --prime bls12381`
+- `src/circuits/bn254/` — compile with standard `circom` (default BN254)
+
 ## Identity Model
 
 Identities stored in the Merkle tree are ZK-friendly hashes:

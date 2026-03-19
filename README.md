@@ -16,6 +16,19 @@ UPC provides a standard interface for **zero-knowledge compliance verification**
 - **Protocols** to require attestations (KYC, age, residency, sanctions clearance) through a pluggable interface
 - **Third parties** to build custom attestation backends (Semaphore, WorldID, zkPass, etc.)
 
+## Security
+
+**Default: BLS12-381 (128-bit security).**
+
+UPC defaults to Poseidon hash over the BLS12-381 curve, providing 128-bit security that meets institutional audit requirements. BN254 (~100-bit security) is available as an opt-in alternative.
+
+| Curve | Security | Use Case |
+|-------|----------|----------|
+| **BLS12-381** (default) | 128-bit | Production, institutional compliance |
+| BN254 (opt-in) | ~100-bit | Legacy compatibility, testing |
+
+The hash function is fully pluggable via the `IHashFunction` interface — you can use either curve, or implement your own.
+
 ## Architecture
 
 ```

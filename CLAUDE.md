@@ -43,9 +43,18 @@ npm test        # Run tests
 npm run lint    # Lint code
 ```
 
+## Cryptographic Defaults
+
+- **Default hash: Poseidon over BLS12-381** (128-bit security)
+- BN254 available as opt-in via `PoseidonBN254` (100-bit security)
+- Hash is pluggable via `IHashFunction` interface in `src/core/hash/`
+- Circuits: both `bn254/` and `bls12381/` versions in `src/circuits/`
+- Trusted setup: Use [Perpetual Powers of Tau](https://github.com/privacy-ethereum/perpetualpowersoftau) BLS12-381 `.ptau` files
+
 ## Key Dependencies
 
-- `circomlibjs` — Poseidon hash (lazy-loaded)
+- `poseidon-bls12381` — Poseidon hash over BLS12-381 (default, 128-bit)
+- `circomlibjs` — Poseidon hash over BN254 (legacy, 100-bit)
 - `viem` — Ethereum interaction (peer dependency)
 - `wagmi` — React hooks (optional peer dependency)
 

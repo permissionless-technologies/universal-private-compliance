@@ -1,11 +1,12 @@
 /**
  * Merkle Tree
  *
- * LeanIMT-compatible Merkle tree with Poseidon hashing.
- * Used for ASP member trees and membership proofs.
+ * LeanIMT-compatible Merkle tree with pluggable hash function.
+ * Default hash: Poseidon over BLS12-381 (128-bit security).
  */
 
-import { poseidon } from './poseidon.js'
+import type { IHashFunction } from './hash/interface.js'
+import { getDefaultHashFunction } from './hash/index.js'
 import type { MerkleProof } from './types.js'
 
 /**
@@ -24,16 +25,19 @@ export const MAX_TREE_DEPTH = 32
  * Features:
  * - Dynamic depth (grows as needed up to maxDepth)
  * - Single-child optimization (LeanIMT: when sibling is 0, propagate current)
- * - Async hash operations (Poseidon is async)
+ * - Pluggable hash function (default: Poseidon-BLS12-381, 128-bit security)
+ * - Async hash operations
  */
 export class MerkleTree {
   private leaves: bigint[] = []
   private nodes: Map<string, bigint> = new Map()
   private cachedRoot: bigint | null = null
   readonly maxDepth: number
+  readonly hashFn: IHashFunction
 
-  constructor(maxDepth: number = DEFAULT_TREE_DEPTH) {
+  constructor(maxDepth: number = DEFAULT_TREE_DEPTH, hashFn?: IHashFunction) {
     this.maxDepth = maxDepth
+    this.hashFn = hashFn ?? getDefaultHashFunction()
   }
 
   /**
@@ -80,7 +84,7 @@ export class MerkleTree {
   }
 
   /**
-   * Get the current root (async because of Poseidon)
+   * Get the current root (async because hash is async)
    */
   async getRoot(): Promise<bigint> {
     if (this.leaves.length === 0) {
@@ -149,7 +153,7 @@ export class MerkleTree {
         // LeanIMT optimization: single child propagation
         hash = leftChild
       } else {
-        hash = await poseidon([leftChild, rightChild])
+        hash = await this.hashFn.hash2(leftChild, rightChild)
       }
     }
 
@@ -171,8 +175,8 @@ export class MerkleTree {
 /**
  * Build a Merkle tree from an array of leaves
  */
-export function buildMerkleTree(leaves: bigint[], maxDepth?: number): MerkleTree {
-  const tree = new MerkleTree(maxDepth)
+export function buildMerkleTree(leaves: bigint[], maxDepth?: number, hashFn?: IHashFunction): MerkleTree {
+  const tree = new MerkleTree(maxDepth, hashFn)
   for (const leaf of leaves) {
     tree.insert(leaf)
   }
@@ -180,12 +184,15 @@ export function buildMerkleTree(leaves: bigint[], maxDepth?: number): MerkleTree
 }
 
 /**
- * Verify a Merkle proof
+ * Verify a Merkle proof using the specified hash function.
+ * Defaults to BLS12-381 Poseidon (128-bit security).
  */
 export async function verifyMerkleProof(
   leaf: bigint,
-  proof: MerkleProof
+  proof: MerkleProof,
+  hashFn?: IHashFunction
 ): Promise<boolean> {
+  const hash = hashFn ?? getDefaultHashFunction()
   let current = leaf
 
   for (let i = 0; i < proof.pathElements.length; i++) {
@@ -193,14 +200,13 @@ export async function verifyMerkleProof(
     const isLeft = proof.pathIndices[i] === 0
 
     if (sibling === 0n) {
-      // LeanIMT: missing sibling means propagation
-      continue
+      continue // LeanIMT: missing sibling means propagation
     }
 
     if (isLeft) {
-      current = await poseidon([current, sibling])
+      current = await hash.hash2(current, sibling)
     } else {
-      current = await poseidon([sibling, current])
+      current = await hash.hash2(sibling, current)
     }
   }
 

@@ -1,33 +1,18 @@
 /**
  * Universal Private Compliance SDK
  *
- * @packageDocumentation
- *
- * Pluggable zero-knowledge attestation & ASP (Association Set Provider) framework.
- *
- * @example
- * ```typescript
- * import { createASPClient, MemoryProvider } from '@permissionless-technologies/universal-private-compliance'
- *
- * const asp = createASPClient({
- *   provider: new MemoryProvider(),
- *   publicClient,
- *   registryAddress: '0x...',
- * })
- *
- * await asp.addMember(identityCommitment)
- * const proof = await asp.generateProof(identityCommitment)
- * ```
+ * Default hash: Poseidon over BLS12-381 (128-bit security).
+ * Alternative: Poseidon over BN254 (100-bit security) via PoseidonBN254.
  */
 
+// Hash (pluggable)
+export type { IHashFunction } from './core/hash/interface.js'
+export { PoseidonBN254, BN254_FIELD_PRIME } from './core/hash/poseidon-bn254.js'
+export { PoseidonBLS12381, BLS12_381_FIELD_PRIME } from './core/hash/poseidon-bls.js'
+export { getDefaultHashFunction } from './core/hash/index.js'
+
 // Core
-export {
-  MerkleTree,
-  buildMerkleTree,
-  verifyMerkleProof,
-  DEFAULT_TREE_DEPTH,
-  MAX_TREE_DEPTH,
-} from './core/tree.js'
+export { MerkleTree, buildMerkleTree, verifyMerkleProof, DEFAULT_TREE_DEPTH, MAX_TREE_DEPTH } from './core/tree.js'
 export {
   generateMembershipProof,
   generateSingleMemberProof,
@@ -40,7 +25,6 @@ export {
   computeIdentityFromAddress,
   computeIdentityFromSecret,
 } from './core/identity.js'
-export { poseidon, isValidFieldElement, FIELD_PRIME } from './core/poseidon.js'
 export { ASPClient, createASPClient } from './core/client.js'
 
 // Types

@@ -56,6 +56,12 @@ export interface ASPClientConfig {
   registryAddress: `0x${string}`
   /** ASP ID (if already registered) */
   aspId?: bigint
+  /**
+   * Hash function for Merkle tree operations.
+   * Default: Poseidon-BLS12-381 (128-bit security).
+   * Use PoseidonBN254 for legacy/testing (100-bit security).
+   */
+  hashFunction?: import('./hash/interface.js').IHashFunction
 }
 
 /**

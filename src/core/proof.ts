@@ -2,8 +2,11 @@
  * Membership Proof Generation
  *
  * Generate ZK-ready membership proofs for ASP trees.
+ * Default hash: Poseidon over BLS12-381 (128-bit security).
  */
 
+import type { IHashFunction } from './hash/interface.js'
+import { getDefaultHashFunction } from './hash/index.js'
 import { MerkleTree, DEFAULT_TREE_DEPTH } from './tree.js'
 import type { MembershipProof } from './types.js'
 
@@ -35,7 +38,7 @@ export function generateSingleMemberProof(
   treeDepth: number = DEFAULT_TREE_DEPTH
 ): MembershipProof {
   return {
-    root: identity, // LeanIMT optimization: single-leaf root = leaf
+    root: identity,
     pathElements: Array(treeDepth).fill(0n) as bigint[],
     pathIndices: Array(treeDepth).fill(0) as number[],
   }
@@ -44,24 +47,22 @@ export function generateSingleMemberProof(
 /**
  * Generate a membership proof for a multi-member tree.
  *
- * Builds the full tree, finds the identity, and extracts a Merkle proof
- * padded to the specified tree depth.
- *
  * @param identity - The identity to prove membership for
  * @param allMembers - All members in the tree
  * @param treeDepth - Target tree depth for padding (default: 20)
- * @throws Error if identity is not found in the member list
+ * @param hashFn - Hash function to use (default: Poseidon-BLS12-381)
  */
 export async function generateMultiMemberProof(
   identity: bigint,
   allMembers: bigint[],
-  treeDepth: number = DEFAULT_TREE_DEPTH
+  treeDepth: number = DEFAULT_TREE_DEPTH,
+  hashFn?: IHashFunction
 ): Promise<MembershipProof> {
   if (allMembers.length <= 1) {
     return generateSingleMemberProof(identity, treeDepth)
   }
 
-  const tree = new MerkleTree(treeDepth)
+  const tree = new MerkleTree(treeDepth, hashFn)
   for (const member of allMembers) {
     tree.insert(member)
   }
@@ -85,18 +86,20 @@ export async function generateMultiMemberProof(
  * Generate a membership proof, automatically choosing single or multi-member mode.
  *
  * @param identity - The identity to prove membership for
- * @param members - All members in the tree (if empty or single, uses single-member optimization)
+ * @param members - All members in the tree
  * @param treeDepth - Target tree depth for padding (default: 20)
+ * @param hashFn - Hash function to use (default: Poseidon-BLS12-381)
  */
 export async function generateMembershipProof(
   identity: bigint,
   members?: bigint[],
-  treeDepth: number = DEFAULT_TREE_DEPTH
+  treeDepth: number = DEFAULT_TREE_DEPTH,
+  hashFn?: IHashFunction
 ): Promise<MembershipProof> {
   if (!members || members.length === 0) {
     return generateSingleMemberProof(identity, treeDepth)
   }
-  return generateMultiMemberProof(identity, members, treeDepth)
+  return generateMultiMemberProof(identity, members, treeDepth, hashFn)
 }
 
 /**
@@ -104,11 +107,12 @@ export async function generateMembershipProof(
  */
 export async function computeMerkleRoot(
   members: bigint[],
-  treeDepth: number = DEFAULT_TREE_DEPTH
+  treeDepth: number = DEFAULT_TREE_DEPTH,
+  hashFn?: IHashFunction
 ): Promise<bigint> {
   if (members.length === 0) return 0n
-  if (members.length === 1) return members[0]! // single-member optimization
-  const tree = new MerkleTree(treeDepth)
+  if (members.length === 1) return members[0]!
+  const tree = new MerkleTree(treeDepth, hashFn)
   for (const member of members) {
     tree.insert(member)
   }
@@ -118,13 +122,16 @@ export async function computeMerkleRoot(
 /**
  * Verify a membership proof locally.
  *
- * Recomputes the root from the proof and checks it matches.
+ * @param identity - The identity to verify
+ * @param proof - The membership proof to check
+ * @param hashFn - Hash function to use (default: Poseidon-BLS12-381)
  */
 export async function verifyMembershipProof(
   identity: bigint,
-  proof: MembershipProof
+  proof: MembershipProof,
+  hashFn?: IHashFunction
 ): Promise<boolean> {
-  const { poseidon } = await import('./poseidon.js')
+  const hash = hashFn ?? getDefaultHashFunction()
 
   let current = identity
 
@@ -133,13 +140,13 @@ export async function verifyMembershipProof(
     const index = proof.pathIndices[i] ?? 0
 
     if (sibling === 0n) {
-      continue // LeanIMT: skip hashing when sibling is 0
+      continue
     }
 
     if (index === 0) {
-      current = await poseidon([current, sibling])
+      current = await hash.hash2(current, sibling)
     } else {
-      current = await poseidon([sibling, current])
+      current = await hash.hash2(sibling, current)
     }
   }
 

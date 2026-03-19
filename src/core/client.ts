@@ -7,6 +7,7 @@
  */
 
 import { generateMembershipProof } from './proof.js'
+import type { IHashFunction } from './hash/interface.js'
 import type {
   ASPClientConfig,
   IASPProvider,
@@ -23,6 +24,7 @@ export class ASPClient {
   private readonly provider: IASPProvider
   private readonly publicClient: any // viem PublicClient
   private readonly registryAddress: `0x${string}`
+  private readonly hashFn: IHashFunction | undefined
   private aspId: bigint | undefined
 
   constructor(config: ASPClientConfig) {
@@ -30,6 +32,7 @@ export class ASPClient {
     this.publicClient = config.publicClient
     this.registryAddress = config.registryAddress
     this.aspId = config.aspId
+    this.hashFn = config.hashFunction
   }
 
   /**
@@ -119,7 +122,7 @@ export class ASPClient {
    */
   async generateProof(identity: bigint): Promise<MembershipProof> {
     const members = await this.provider.getMembers()
-    return generateMembershipProof(identity, members, this.provider.treeDepth)
+    return generateMembershipProof(identity, members, this.provider.treeDepth, this.hashFn)
   }
 
   /**
