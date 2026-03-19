@@ -29,6 +29,10 @@ UPC defaults to Poseidon hash over the BLS12-381 curve, providing 128-bit securi
 
 The hash function is fully pluggable via the `IHashFunction` interface — you can use either curve, or implement your own.
 
+### Proof System: PLONK
+
+UPC uses **PLONK** (not Groth16) to eliminate per-circuit trusted setup ceremonies. Phase 1 uses the [Perpetual Powers of Tau](https://github.com/privacy-ethereum/perpetualpowersoftau) community ceremony (18 BLS12-381 contributors). Phase 2 is fully deterministic — no toxic waste, no ceremony participants to audit. Long-term, STARKs (no setup at all) are supported via the pluggable hash interface.
+
 ## Architecture
 
 ```

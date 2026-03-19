@@ -49,7 +49,10 @@ npm run lint    # Lint code
 - BN254 available as opt-in via `PoseidonBN254` (100-bit security)
 - Hash is pluggable via `IHashFunction` interface in `src/core/hash/`
 - Circuits: both `bn254/` and `bls12381/` versions in `src/circuits/`
-- Trusted setup: Use [Perpetual Powers of Tau](https://github.com/privacy-ethereum/perpetualpowersoftau) BLS12-381 `.ptau` files
+- **Proof system: PLONK** (NOT Groth16) — universal trusted setup, no per-circuit ceremony
+- Phase 1: [Perpetual Powers of Tau](https://github.com/privacy-ethereum/perpetualpowersoftau) BLS12-381 `.ptau` files
+- Phase 2: Deterministic (`snarkjs plonk setup`) — no toxic waste, no MPC ceremony
+- `OptionalMembershipProof` does NOT belong in UPC — bypass/ragequit is a pool concept, belongs in UPP
 
 ## Key Dependencies
 
