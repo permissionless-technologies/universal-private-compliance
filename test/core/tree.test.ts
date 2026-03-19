@@ -145,6 +145,132 @@ describe('MerkleTree', () => {
     })
   })
 
+  describe('LeanIMT propagation correctness', () => {
+    it('3-leaf tree: right sibling of second pair is 0, left child propagates', async () => {
+      // With 3 leaves [A, B, C]:
+      //   Level 0: A  B  C  (empty)
+      //   Level 1: H(A,B)  C  ← C propagates because right sibling is 0
+      //   Level 2: H(H(A,B), C)
+      const tree = new MerkleTree(20, bn254)
+      tree.insert(1n)
+      tree.insert(2n)
+      tree.insert(3n)
+
+      const root = await tree.getRoot()
+      const hashAB = await bn254.hash2(1n, 2n)
+      // C propagates (sibling is 0 → LeanIMT single-child)
+      const expected = await bn254.hash2(hashAB, 3n)
+      expect(root).toBe(expected)
+    })
+
+    it('4-leaf tree: balanced, no propagation', async () => {
+      const tree = new MerkleTree(20, bn254)
+      tree.insert(1n)
+      tree.insert(2n)
+      tree.insert(3n)
+      tree.insert(4n)
+
+      const root = await tree.getRoot()
+      const hashAB = await bn254.hash2(1n, 2n)
+      const hashCD = await bn254.hash2(3n, 4n)
+      const expected = await bn254.hash2(hashAB, hashCD)
+      expect(root).toBe(expected)
+    })
+
+    it('5-leaf tree: mixed propagation', async () => {
+      // 5 leaves: [A, B, C, D, E]
+      //   Level 0: A  B  C  D  E  (empty) (empty) (empty)
+      //   Level 1: H(A,B)  H(C,D)  E←propagates  0
+      //   Level 2: H(H(A,B), H(C,D))  E←propagates
+      //   Level 3: H(H(H(A,B),H(C,D)), E)
+      const tree = new MerkleTree(20, bn254)
+      for (let i = 1n; i <= 5n; i++) tree.insert(i)
+
+      const root = await tree.getRoot()
+      const h12 = await bn254.hash2(1n, 2n)
+      const h34 = await bn254.hash2(3n, 4n)
+      const h1234 = await bn254.hash2(h12, h34)
+      // 5n propagates through two levels (sibling 0 at level 0, sibling 0 at level 1)
+      const expected = await bn254.hash2(h1234, 5n)
+      expect(root).toBe(expected)
+    })
+
+    it('proof verifies for each leaf in a 5-leaf tree', async () => {
+      const tree = new MerkleTree(20, bn254)
+      const leaves = [100n, 200n, 300n, 400n, 500n]
+      for (const l of leaves) tree.insert(l)
+
+      for (let i = 0; i < leaves.length; i++) {
+        const proof = await tree.getProof(i)
+        expect(await verifyMerkleProof(leaves[i]!, proof, bn254)).toBe(true)
+      }
+    })
+  })
+
+  describe('power-of-2 vs non-power-of-2', () => {
+    it('2 and 3 leaf trees have different roots', async () => {
+      const tree2 = new MerkleTree(20, bn254)
+      tree2.insert(1n)
+      tree2.insert(2n)
+
+      const tree3 = new MerkleTree(20, bn254)
+      tree3.insert(1n)
+      tree3.insert(2n)
+      tree3.insert(3n)
+
+      expect(await tree2.getRoot()).not.toBe(await tree3.getRoot())
+    })
+
+    it('4 and 5 leaf trees have different roots', async () => {
+      const tree4 = new MerkleTree(20, bn254)
+      const tree5 = new MerkleTree(20, bn254)
+      for (let i = 1n; i <= 4n; i++) { tree4.insert(i); tree5.insert(i) }
+      tree5.insert(5n)
+
+      expect(await tree4.getRoot()).not.toBe(await tree5.getRoot())
+    })
+  })
+
+  describe('depth limits', () => {
+    it('tree with depth 2 supports up to 4 leaves', async () => {
+      const tree = new MerkleTree(2, bn254)
+      tree.insert(1n)
+      tree.insert(2n)
+      tree.insert(3n)
+      tree.insert(4n)
+      expect(tree.size).toBe(4)
+      const root = await tree.getRoot()
+      expect(root).toBeTypeOf('bigint')
+
+      // All 4 proofs should verify
+      for (let i = 0; i < 4; i++) {
+        const proof = await tree.getProof(i)
+        expect(await verifyMerkleProof([1n, 2n, 3n, 4n][i]!, proof, bn254)).toBe(true)
+      }
+    })
+
+    it('tree depth grows automatically', () => {
+      const tree = new MerkleTree(20, bn254)
+      expect(tree.depth).toBe(0)
+      tree.insert(1n)
+      expect(tree.depth).toBe(0) // single leaf = depth 0
+      tree.insert(2n)
+      expect(tree.depth).toBe(1) // 2 leaves = depth 1
+      tree.insert(3n)
+      expect(tree.depth).toBe(2) // 3 leaves = depth 2
+      tree.insert(4n)
+      expect(tree.depth).toBe(2) // 4 leaves = depth 2 (exact power of 2)
+      tree.insert(5n)
+      expect(tree.depth).toBe(3) // 5 leaves = depth 3
+    })
+
+    it('negative index throws', async () => {
+      const tree = new MerkleTree(20, bn254)
+      tree.insert(1n)
+      await expect(tree.getProof(-1)).rejects.toThrow('out of bounds')
+    })
+  })
+
   describe('buildMerkleTree helper', () => {
     it('builds from array', async () => {
       const tree = buildMerkleTree([1n, 2n, 3n], 20, bn254)
