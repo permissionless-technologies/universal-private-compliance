@@ -1,0 +1,132 @@
+# Universal Private Compliance (UPC)
+
+Pluggable zero-knowledge attestation & ASP (Association Set Provider) framework for Ethereum.
+
+Part of the **Permissionless Technologies** product family:
+- **UPD** — Universal Private Dollar
+- **UPP** — Universal Private Pool
+- **UPC** — Universal Private Compliance (this package)
+
+## What is UPC?
+
+UPC provides a standard interface for **zero-knowledge compliance verification** on Ethereum. It allows:
+
+- **Institutions** to operate ASPs (Association Set Providers) — Merkle trees of approved identities
+- **Users** to prove membership in an ASP via ZK proof without revealing their identity
+- **Protocols** to require attestations (KYC, age, residency, sanctions clearance) through a pluggable interface
+- **Third parties** to build custom attestation backends (Semaphore, WorldID, zkPass, etc.)
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────┐
+│              AttestationHub (on-chain)             │
+│                                                    │
+│  verify(verifierId, identity, proof) → bool        │
+│                                                    │
+├──────────┬──────────────┬──────────────┬──────────┤
+│          │              │              │          │
+│ MerkleASP│  Semaphore   │   WorldID    │  Custom  │
+│ Verifier │  Adapter     │   Adapter    │ Adapter  │
+└──────────┴──────────────┴──────────────┴──────────┘
+
+┌──────────────────────────────────────────────────┐
+│              Provider Interface (off-chain)        │
+│                                                    │
+│  IASPProvider { addMember, getRoot, getProof }     │
+│                                                    │
+├──────────┬──────────────┬──────────────┬──────────┤
+│          │              │              │          │
+│  Memory  │ LocalStorage │   REST API   │  Custom  │
+│ Provider │  Provider    │   Provider   │ Provider │
+└──────────┴──────────────┴──────────────┴──────────┘
+```
+
+## Quick Start
+
+```bash
+npm install @permissionless-technologies/universal-private-compliance
+```
+
+### As an ASP Operator
+
+```typescript
+import { createASPClient, MemoryProvider } from '@permissionless-technologies/universal-private-compliance'
+
+const asp = createASPClient({
+  provider: new MemoryProvider({ treeDepth: 20 }),
+  publicClient,
+  registryAddress: '0x...',
+})
+
+// Register your ASP on-chain
+const aspId = await asp.register({ name: 'My KYC ASP', walletClient })
+
+// Add approved members
+await asp.addMember(identityCommitment)
+
+// Publish the Merkle root on-chain
+await asp.publishRoot({ walletClient })
+```
+
+### As a User (proving membership)
+
+```typescript
+import { createASPClient, LocalStorageProvider } from '@permissionless-technologies/universal-private-compliance'
+
+const asp = createASPClient({
+  provider: new LocalStorageProvider({ chainId: 1, aspId: 1n }),
+  publicClient,
+  registryAddress: '0x...',
+})
+
+// Generate a ZK membership proof
+const proof = await asp.generateProof(myIdentity)
+// → { root, pathElements, pathIndices }
+```
+
+### As a Protocol (verifying compliance)
+
+```solidity
+import { IAttestationVerifier } from "@permissionless-technologies/upc/interfaces/IAttestationVerifier.sol";
+
+contract MyProtocol {
+    IAttestationVerifier public attestationHub;
+
+    function doSomething(uint256 verifierId, uint256 identity, bytes calldata proof) external {
+        require(attestationHub.verify(identity, proof), "Attestation required");
+        // ... proceed with business logic
+    }
+}
+```
+
+## Custom Providers
+
+Implement `IASPProvider` to connect any storage backend:
+
+```typescript
+import type { IASPProvider } from '@permissionless-technologies/universal-private-compliance'
+
+class MyDatabaseProvider implements IASPProvider {
+  name = 'My Database'
+  treeDepth = 20
+
+  async addMember(identity: bigint): Promise<void> { /* ... */ }
+  async removeMember(identity: bigint): Promise<void> { /* ... */ }
+  async getMembers(): Promise<bigint[]> { /* ... */ }
+  async hasMember(identity: bigint): Promise<boolean> { /* ... */ }
+  async getRoot(): Promise<bigint> { /* ... */ }
+  async getMerkleProof(identity: bigint): Promise<MerkleProof> { /* ... */ }
+}
+```
+
+## Documentation
+
+- [Getting Started](docs/getting-started.md)
+- [Architecture](docs/architecture.md)
+- [Custom Providers](docs/providers.md)
+- [Smart Contracts](docs/contracts.md)
+
+## License
+
+See [LICENSE](LICENSE) file.
