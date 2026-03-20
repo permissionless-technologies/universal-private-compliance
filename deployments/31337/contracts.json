@@ -1,0 +1,8 @@
+{
+  "chainId": 31337,
+  "chainName": "Anvil (Local)",
+  "contracts": {
+    "ASPRegistryHub": ""
+  },
+  "note": "Addresses populated by local deployment script. Run `forge script` or `npm run deploy:local` in upp-sdk."
+}

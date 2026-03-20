@@ -1,6 +1,6 @@
 {
   "name": "@permissionless-technologies/universal-private-compliance",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Universal Private Compliance SDK — Pluggable zero-knowledge attestation & ASP (Association Set Provider) framework",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -35,7 +35,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "deployments"
   ],
   "scripts": {
     "build": "tsup",

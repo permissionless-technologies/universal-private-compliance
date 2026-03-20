@@ -1,0 +1,9 @@
+{
+  "chainId": 11155111,
+  "chainName": "Sepolia",
+  "contracts": {
+    "ASPRegistryHub": "0xfd11c56a23314aa88dfbcc36254f33e5e8b010df"
+  },
+  "deployBlock": 10477882,
+  "note": "ASPRegistryHub deployed as part of UPP deployment. AttestationHub not yet deployed (pool uses ASPRegistryHub directly)."
+}

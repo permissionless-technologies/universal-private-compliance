@@ -43,3 +43,7 @@ export type {
   PublishRootOptions,
   IASPProvider,
 } from './types.js'
+
+// ASP List
+export type { ASPEntry, ASPList, ASPType, ASPSecurityLevel } from './asp-list.js'
+export { parseASPList, getActiveASPs, findASPById, fetchASPProof } from './asp-list.js'

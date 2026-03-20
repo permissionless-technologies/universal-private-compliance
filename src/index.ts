@@ -43,5 +43,9 @@ export { MemoryProvider } from './providers/memory.js'
 export { LocalStorageProvider, storePersonalASPId, loadPersonalASPId } from './providers/localStorage.js'
 export { RESTProvider } from './providers/rest.js'
 
+// ASP List
+export type { ASPEntry, ASPList, ASPType, ASPSecurityLevel } from './core/asp-list.js'
+export { parseASPList, getActiveASPs, findASPById, fetchASPProof } from './core/asp-list.js'
+
 // Contract ABIs
 export { ASP_REGISTRY_HUB_ABI } from './contracts/abi/ASPRegistryHub.js'
