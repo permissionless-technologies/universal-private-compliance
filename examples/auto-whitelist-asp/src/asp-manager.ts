@@ -16,6 +16,7 @@ import {
   type ASPClient,
   type MembershipProof,
 } from '@permissionless-technologies/universal-private-compliance'
+import { passesSanctionsCheck, getBlocklistSize } from './sanctions.js'
 import {
   createPublicClient,
   createWalletClient,
@@ -43,6 +44,7 @@ export class ASPManager {
   readonly walletClient: WalletClient
 
   private syncedAddresses = new Set<string>()
+  private blockedAddresses = new Set<string>()
   private isCatchingUp = true
   private lastPublishedRoot = 0n
 
@@ -93,14 +95,22 @@ export class ASPManager {
   }
 
   /**
-   * Add an address to the whitelist.
+   * Add an address to the whitelist after sanctions screening.
    * Converts the address to an identity commitment and adds it to the Merkle tree.
    *
-   * @returns true if the address was new (not already whitelisted)
+   * @returns true if the address was new and passed sanctions check
    */
   async addAddress(address: Address): Promise<boolean> {
     const normalized = address.toLowerCase()
     if (this.syncedAddresses.has(normalized)) return false
+    if (this.blockedAddresses.has(normalized)) return false
+
+    // Sanctions check — in production, this queries a real database
+    if (!passesSanctionsCheck(address)) {
+      this.blockedAddresses.add(normalized)
+      console.log(`BLOCKED: ${address} failed sanctions check`)
+      return false
+    }
 
     const identity = computeIdentityFromAddress(address)
     await this.provider.addMember(identity)
@@ -166,6 +176,8 @@ export class ASPManager {
   getStatus() {
     return {
       memberCount: this.syncedAddresses.size,
+      blockedCount: this.blockedAddresses.size,
+      blocklistSize: getBlocklistSize(),
       isCatchingUp: this.isCatchingUp,
       aspId: this.client.getASPId()?.toString() ?? null,
       lastPublishedRoot: this.lastPublishedRoot.toString(),
