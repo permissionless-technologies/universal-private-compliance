@@ -145,6 +145,7 @@ class MyDatabaseProvider implements IASPProvider {
 - [Custom Providers](docs/providers.md)
 - [Smart Contracts](docs/contracts.md)
 - [Running an ASP Service](docs/running-an-asp.md)
+- [Protocol Integration](docs/integration.md)
 
 ## License
 
