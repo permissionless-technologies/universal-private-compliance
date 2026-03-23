@@ -1,6 +1,6 @@
 {
   "name": "@permissionless-technologies/upc-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Universal Private Compliance SDK — Pluggable zero-knowledge attestation & ASP (Association Set Provider) framework",
   "workspaces": [
     "packages/*"
