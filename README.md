@@ -36,22 +36,22 @@ UPC uses **PLONK** (not Groth16) to eliminate per-circuit trusted setup ceremoni
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────┐
-│              AttestationHub (on-chain)             │
-│                                                    │
-│  verify(verifierId, identity, proof) → bool        │
-│                                                    │
+┌───────────────────────────────────────────────────┐
+│              AttestationHub (on-chain)            │
+│                                                   │
+│  verify(verifierId, identity, proof) → bool       │
+│                                                   │
 ├──────────┬──────────────┬──────────────┬──────────┤
 │          │              │              │          │
 │ MerkleASP│  Semaphore   │   WorldID    │  Custom  │
 │ Verifier │  Adapter     │   Adapter    │ Adapter  │
 └──────────┴──────────────┴──────────────┴──────────┘
 
-┌──────────────────────────────────────────────────┐
-│              Provider Interface (off-chain)        │
-│                                                    │
-│  IASPProvider { addMember, getRoot, getProof }     │
-│                                                    │
+┌───────────────────────────────────────────────────┐
+│              Provider Interface (off-chain)       │
+│                                                   │
+│  IASPProvider { addMember, getRoot, getProof }    │
+│                                                   │
 ├──────────┬──────────────┬──────────────┬──────────┤
 │          │              │              │          │
 │  Memory  │ LocalStorage │   REST API   │  Custom  │
