@@ -70,7 +70,7 @@ deployments/
 ### Loading an ASP list
 
 ```typescript
-import { parseASPList, getActiveASPs, type ASPList } from '@permissionless-technologies/universal-private-compliance'
+import { parseASPList, getActiveASPs, type ASPList } from '@permissionless-technologies/upc-sdk'
 
 // Load from a JSON file, API, or bundled in your app
 const raw = await fetch('/asp-list.json').then(r => r.json())
@@ -83,7 +83,7 @@ const activeASPs = getActiveASPs(list)
 ### Fetching a membership proof
 
 ```typescript
-import { fetchASPProof, findASPById } from '@permissionless-technologies/universal-private-compliance'
+import { fetchASPProof, findASPById } from '@permissionless-technologies/upc-sdk'
 
 const asp = findASPById(list, 1) // aspId = 1
 if (!asp) throw new Error('ASP not found')

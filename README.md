@@ -62,13 +62,13 @@ UPC uses **PLONK** (not Groth16) to eliminate per-circuit trusted setup ceremoni
 ## Quick Start
 
 ```bash
-npm install @permissionless-technologies/universal-private-compliance
+npm install @permissionless-technologies/upc-sdk
 ```
 
 ### As an ASP Operator
 
 ```typescript
-import { createASPClient, MemoryProvider } from '@permissionless-technologies/universal-private-compliance'
+import { createASPClient, MemoryProvider } from '@permissionless-technologies/upc-sdk'
 
 const asp = createASPClient({
   provider: new MemoryProvider({ treeDepth: 20 }),
@@ -89,7 +89,7 @@ await asp.publishRoot({ walletClient })
 ### As a User (proving membership)
 
 ```typescript
-import { createASPClient, LocalStorageProvider } from '@permissionless-technologies/universal-private-compliance'
+import { createASPClient, LocalStorageProvider } from '@permissionless-technologies/upc-sdk'
 
 const asp = createASPClient({
   provider: new LocalStorageProvider({ chainId: 1, aspId: 1n }),
@@ -122,7 +122,7 @@ contract MyProtocol {
 Implement `IASPProvider` to connect any storage backend:
 
 ```typescript
-import type { IASPProvider } from '@permissionless-technologies/universal-private-compliance'
+import type { IASPProvider } from '@permissionless-technologies/upc-sdk'
 
 class MyDatabaseProvider implements IASPProvider {
   name = 'My Database'

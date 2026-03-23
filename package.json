@@ -1,7 +1,10 @@
 {
-  "name": "@permissionless-technologies/universal-private-compliance",
-  "version": "0.0.2",
+  "name": "@permissionless-technologies/upc-sdk",
+  "version": "0.1.0",
   "description": "Universal Private Compliance SDK — Pluggable zero-knowledge attestation & ASP (Association Set Provider) framework",
+  "workspaces": [
+    "packages/*"
+  ],
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -62,7 +65,7 @@
     "viem"
   ],
   "author": "",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "AGPL-3.0-or-later",
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
     "viem": "^2.0.0",

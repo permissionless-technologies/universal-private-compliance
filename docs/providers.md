@@ -29,7 +29,7 @@ interface IASPProvider {
 In-memory storage. Data is lost when the process exits. Use for tests and scripts.
 
 ```typescript
-import { MemoryProvider } from '@permissionless-technologies/universal-private-compliance'
+import { MemoryProvider } from '@permissionless-technologies/upc-sdk'
 
 const provider = new MemoryProvider({ treeDepth: 20 })
 ```
@@ -39,7 +39,7 @@ const provider = new MemoryProvider({ treeDepth: 20 })
 Browser `localStorage` storage. Data persists across page reloads. Use for browser demos.
 
 ```typescript
-import { LocalStorageProvider } from '@permissionless-technologies/universal-private-compliance'
+import { LocalStorageProvider } from '@permissionless-technologies/upc-sdk'
 
 const provider = new LocalStorageProvider({
   chainId: 1,
@@ -53,7 +53,7 @@ const provider = new LocalStorageProvider({
 Delegates to a backend API. Use for production ASP services.
 
 ```typescript
-import { RESTProvider } from '@permissionless-technologies/universal-private-compliance'
+import { RESTProvider } from '@permissionless-technologies/upc-sdk'
 
 const provider = new RESTProvider({
   baseUrl: 'https://api.myasp.com',
@@ -65,8 +65,8 @@ const provider = new RESTProvider({
 ## Implementing a Custom Provider
 
 ```typescript
-import type { IASPProvider, MerkleProof } from '@permissionless-technologies/universal-private-compliance'
-import { MerkleTree } from '@permissionless-technologies/universal-private-compliance/core'
+import type { IASPProvider, MerkleProof } from '@permissionless-technologies/upc-sdk'
+import { MerkleTree } from '@permissionless-technologies/upc-sdk/core'
 
 class PostgresProvider implements IASPProvider {
   readonly name = 'Postgres ASP'

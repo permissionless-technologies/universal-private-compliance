@@ -7,7 +7,7 @@ This guide shows how to integrate Universal Private Compliance (UPC) into an exi
 ## Installation
 
 ```bash
-npm install @permissionless-technologies/universal-private-compliance
+npm install @permissionless-technologies/upc-sdk
 ```
 
 ## Pattern: Thin Adapter Layer
@@ -23,7 +23,7 @@ import {
   computeMerkleRoot,
   DEFAULT_TREE_DEPTH,
   PoseidonBN254,  // or PoseidonBLS12381 for 128-bit security
-} from '@permissionless-technologies/universal-private-compliance'
+} from '@permissionless-technologies/upc-sdk'
 
 // Your protocol-specific proof type (adds aspId, etc.)
 export interface ASPProof {
@@ -62,7 +62,7 @@ import {
   parseASPList,
   getActiveASPs,
   fetchASPProof,
-} from '@permissionless-technologies/universal-private-compliance'
+} from '@permissionless-technologies/upc-sdk'
 
 // Load list (from your own JSON, CDN, or bundled)
 const raw = await fetch('/asp-list.json').then(r => r.json())
@@ -81,7 +81,7 @@ If your SDK re-exports the ASP Registry ABI, import it from UPC:
 
 ```typescript
 // your-sdk/src/contracts/abi/index.ts
-export { ASP_REGISTRY_HUB_ABI } from '@permissionless-technologies/universal-private-compliance'
+export { ASP_REGISTRY_HUB_ABI } from '@permissionless-technologies/upc-sdk'
 ```
 
 ## Hash Function Selection

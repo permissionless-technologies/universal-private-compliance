@@ -15,7 +15,7 @@ import {
   computeIdentityFromAddress,
   type ASPClient,
   type MembershipProof,
-} from '@permissionless-technologies/universal-private-compliance'
+} from '@permissionless-technologies/upc-sdk'
 import { passesSanctionsCheck, getBlocklistSize } from './sanctions.js'
 import {
   createPublicClient,

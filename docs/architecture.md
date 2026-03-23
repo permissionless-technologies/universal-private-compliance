@@ -108,7 +108,7 @@ BLS12-381 provides proper 128-bit security and is now gas-efficient on Ethereum 
 ### Using BN254 (opt-in)
 
 ```typescript
-import { MerkleTree, PoseidonBN254 } from '@permissionless-technologies/universal-private-compliance'
+import { MerkleTree, PoseidonBN254 } from '@permissionless-technologies/upc-sdk'
 
 const tree = new MerkleTree(20, new PoseidonBN254())
 ```

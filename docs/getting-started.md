@@ -3,7 +3,7 @@
 ## Installation
 
 ```bash
-npm install @permissionless-technologies/universal-private-compliance
+npm install @permissionless-technologies/upc-sdk
 ```
 
 ### Peer Dependencies
@@ -25,7 +25,7 @@ npm install react wagmi
 ### 1. Create an ASP Client
 
 ```typescript
-import { createASPClient, MemoryProvider } from '@permissionless-technologies/universal-private-compliance'
+import { createASPClient, MemoryProvider } from '@permissionless-technologies/upc-sdk'
 import { createPublicClient, http } from 'viem'
 import { mainnet } from 'viem/chains'
 
