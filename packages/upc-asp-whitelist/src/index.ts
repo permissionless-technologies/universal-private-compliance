@@ -4,20 +4,14 @@
  * Auto-whitelist ASP service — watches on-chain events and automatically
  * whitelists addresses after sanctions screening.
  *
- * Usage:
- *   import { startASPService } from '@permissionless-technologies/upc-asp-whitelist'
- *
- *   startASPService({
- *     rpcUrl: 'http://localhost:8545',
- *     registryAddress: '0x...',
- *     watchAddress: '0x...',
- *     watchMode: 'pool',
- *     operatorPrivateKey: '0x...',
- *     port: 3001,
- *   })
+ * Two indexer modes:
+ *   - 'rpc' (default): uses viem getLogs for history + watchEvent for live.
+ *     Best for local dev / Anvil / short history.
+ *   - 'subsquid': uses Subsquid archive for history (no RPC quota hit),
+ *     then RPC for live. Best for Sepolia / mainnet / long history.
  */
 
-import { type Address, parseAbiItem } from 'viem'
+import { type Address, parseAbiItem, getAddress } from 'viem'
 import { ASPManager, type ASPManagerConfig } from './asp-manager.js'
 import { createServer } from './server.js'
 
@@ -28,6 +22,12 @@ export { passesSanctionsCheck, getBlocklistSize } from './sanctions.js'
 
 const SHIELDED_EVENT = parseAbiItem('event Shielded(address indexed token, address indexed depositor, bytes32 indexed commitment, uint256 leafIndex, bytes encryptedNote)')
 const TRANSFER_EVENT = parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 value)')
+
+// Pre-computed event topic hashes for Subsquid
+const TRANSFER_TOPIC_HASH = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+// keccak256("Shielded(address,address,bytes32,uint256,bytes)")
+const SHIELDED_TOPIC_HASH = '0x182f8e2402f7dc817cf49fd6c7d3e02dab246a031754c5e3e9db83a28a4b1a01'
+const ZERO_TOPIC = '0x0000000000000000000000000000000000000000000000000000000000000000'
 
 const BATCH_SIZE = 10_000n
 
@@ -56,13 +56,19 @@ export interface ASPServiceConfig {
   chainId?: number
   /** Block to start indexing from (default: 0) */
   deployBlock?: bigint
+  /**
+   * Indexer mode:
+   *   rpc — use viem getLogs for historical catch-up (hits RPC, best for local/Anvil)
+   *   subsquid — use Subsquid archive for history (no RPC quota hit, best for Sepolia/mainnet)
+   * Default: 'rpc'
+   */
+  indexer?: 'rpc' | 'subsquid'
+  /** Subsquid archive URL (required when indexer='subsquid') */
+  subsquidArchive?: string
 }
 
 /**
  * Start an auto-whitelist ASP service.
- *
- * This starts an Express API server and begins watching for on-chain events.
- * Historical events are caught up first, then live events are watched.
  *
  * @returns The ASPManager instance (for programmatic access)
  */
@@ -71,13 +77,12 @@ export async function startASPService(config: ASPServiceConfig): Promise<ASPMana
     rpcUrl,
     registryAddress,
     watchAddress,
-    watchMode,
     operatorPrivateKey,
     aspId,
     aspName,
     port = 3001,
     chainId,
-    deployBlock = 0n,
+    indexer = 'rpc',
   } = config
 
   const manager = new ASPManager({
@@ -92,9 +97,24 @@ export async function startASPService(config: ASPServiceConfig): Promise<ASPMana
   await manager.initialize()
   createServer(manager, port)
 
-  // Historical catch-up
+  if (indexer === 'subsquid') {
+    await startSubsquidIndexer(manager, config)
+  } else {
+    await startRpcIndexer(manager, config)
+  }
+
+  return manager
+}
+
+// ============================================================================
+// RPC Indexer (viem getLogs + watchEvent)
+// ============================================================================
+
+async function startRpcIndexer(manager: ASPManager, config: ASPServiceConfig) {
+  const { watchAddress, watchMode, deployBlock = 0n } = config
+
   const modeLabel = watchMode === 'pool' ? 'pool shield' : 'token mint'
-  console.log(`\nCatching up on historical ${modeLabel} events for ${watchAddress}...`)
+  console.log(`\n[RPC] Catching up on historical ${modeLabel} events for ${watchAddress}...`)
   const latestBlock = await manager.publicClient.getBlockNumber()
 
   let fromBlock = deployBlock
@@ -137,12 +157,110 @@ export async function startASPService(config: ASPServiceConfig): Promise<ASPMana
     fromBlock = toBlock + 1n
   }
 
-  console.log(`Historical catch-up complete: ${total} unique addresses whitelisted`)
+  console.log(`[RPC] Historical catch-up complete: ${total} unique addresses whitelisted`)
   manager.setCatchingUp(false)
   await manager.publishRootIfChanged()
 
-  // Live event watching
-  console.log(`\nWatching for live ${modeLabel} events on ${watchAddress}...`)
+  startLiveWatcher(manager, config)
+}
+
+// ============================================================================
+// Subsquid Indexer (archive for history, then live via Subsquid's built-in RPC)
+// ============================================================================
+
+async function startSubsquidIndexer(manager: ASPManager, config: ASPServiceConfig) {
+  const { watchAddress, watchMode, rpcUrl, subsquidArchive, deployBlock = 0n } = config
+
+  if (!subsquidArchive) {
+    throw new Error('subsquidArchive URL required when indexer="subsquid"')
+  }
+
+  // Dynamic import — subsquid is an optional dependency
+  const { EvmBatchProcessor } = await import('@subsquid/evm-processor')
+
+  const modeLabel = watchMode === 'pool' ? 'pool shield' : 'token mint'
+
+  const processor = new EvmBatchProcessor()
+    .setGateway(subsquidArchive)
+    .setRpcEndpoint(rpcUrl)
+    .setFinalityConfirmation(10)
+    .setBlockRange({ from: Number(deployBlock) })
+
+  if (watchMode === 'pool') {
+    processor.addLog({
+      address: [watchAddress.toLowerCase()],
+      topic0: [SHIELDED_TOPIC_HASH],
+    })
+  } else {
+    processor.addLog({
+      address: [watchAddress.toLowerCase()],
+      topic0: [TRANSFER_TOPIC_HASH],
+      topic1: [ZERO_TOPIC],
+    })
+  }
+
+  processor.setFields({ log: { topics: true, data: true } })
+
+  console.log(`\n[Subsquid] Starting processor for ${modeLabel} events on ${watchAddress}...`)
+
+  // No-op database — we don't persist indexed data to a DB,
+  // the ASPManager's MemoryProvider is our state.
+  // Implements the minimal Subsquid Database<S> interface.
+  const inMemoryStore = {
+    async connect() {
+      return { hash: '0x', height: Number(deployBlock) || 0 }
+    },
+    async transact(_info: any, cb: (store: any) => Promise<void>) {
+      await cb({})
+    },
+  }
+
+  processor.run(inMemoryStore as any, async (ctx: any) => {
+      const addresses: Address[] = []
+
+      for (const block of ctx.blocks) {
+        for (const log of block.logs) {
+          if (watchMode === 'pool') {
+            // Shielded event: depositor is topic2 (second indexed param)
+            if (log.topics[2]) {
+              addresses.push(getAddress('0x' + log.topics[2].slice(26)) as Address)
+            }
+          } else {
+            // Transfer event: 'to' is topic2
+            if (log.topics[2]) {
+              addresses.push(getAddress('0x' + log.topics[2].slice(26)) as Address)
+            }
+          }
+        }
+      }
+
+      if (addresses.length > 0) {
+        const added = await manager.addAddresses(addresses)
+        if (added > 0) {
+          const lastBlock = ctx.blocks[ctx.blocks.length - 1]?.header?.height ?? '?'
+          console.log(`[Subsquid] Block ${lastBlock}: +${added} new addresses (${manager.getWhitelistedAddresses().length} total)`)
+        }
+      }
+
+      if (ctx.isHead) {
+        if (manager.getStatus().isCatchingUp) {
+          manager.setCatchingUp(false)
+          console.log(`\n[Subsquid] Historical catch-up complete: ${manager.getWhitelistedAddresses().length} unique addresses`)
+        }
+        await manager.publishRootIfChanged()
+      }
+    }
+  )
+}
+
+// ============================================================================
+// Live Event Watcher (used by RPC mode only; Subsquid handles its own live)
+// ============================================================================
+
+function startLiveWatcher(manager: ASPManager, config: ASPServiceConfig) {
+  const { watchAddress, watchMode } = config
+  const modeLabel = watchMode === 'pool' ? 'pool shield' : 'token mint'
+  console.log(`[RPC] Watching for live ${modeLabel} events on ${watchAddress}...`)
 
   if (watchMode === 'pool') {
     manager.publicClient.watchContractEvent({
@@ -155,7 +273,7 @@ export async function startASPService(config: ASPServiceConfig): Promise<ASPMana
           if (!depositor) continue
           const isNew = await manager.addAddress(depositor)
           if (isNew) {
-            console.log(`New depositor: ${depositor}`)
+            console.log(`[Live] New depositor: ${depositor}`)
             await manager.publishRootIfChanged()
           }
         }
@@ -173,7 +291,7 @@ export async function startASPService(config: ASPServiceConfig): Promise<ASPMana
           if (!to) continue
           const isNew = await manager.addAddress(to)
           if (isNew) {
-            console.log(`New minter: ${to}`)
+            console.log(`[Live] New minter: ${to}`)
             await manager.publishRootIfChanged()
           }
         }
@@ -182,5 +300,4 @@ export async function startASPService(config: ASPServiceConfig): Promise<ASPMana
   }
 
   console.log('Auto-whitelist ASP is running. Press Ctrl+C to stop.')
-  return manager
 }
