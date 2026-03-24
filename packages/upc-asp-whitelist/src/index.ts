@@ -1,76 +1,49 @@
 /**
  * @permissionless-technologies/upc-asp-whitelist
  *
- * Generic auto-whitelist ASP service — watches any on-chain event and
- * automatically whitelists addresses extracted from a specified topic index,
- * after sanctions screening.
+ * Generic auto-whitelist ASP service with composable architecture:
  *
- * The package is pool-agnostic. The deployment project provides:
- *   - Which event to watch (as an AbiEvent object)
- *   - Which topic contains the address to whitelist
- *   - Which contract address to watch
- *
- * Two indexer modes:
- *   - 'rpc' (default): viem getLogs + watchEvent. Best for local/Anvil.
- *   - 'subsquid': Subsquid archive for history. Best for Sepolia/mainnet.
+ *   - Event Source (IEventSource): where addresses come from
+ *   - Membership Gate (IMembershipGate): who gets whitelisted
+ *   - API Server: standard endpoints (/root, /proof/:addr, /members, /status)
  */
 
-import {
-  type AbiEvent,
-  type Address,
-  getAddress,
-  toEventSelector,
-} from 'viem'
+import type { Address } from 'viem'
+import type { IEventSource } from '@permissionless-technologies/upc-sdk/asp'
+import type { IMembershipGate } from '@permissionless-technologies/upc-sdk/asp'
 import { ASPManager, type ASPManagerConfig } from './asp-manager.js'
 import { createServer } from './server.js'
 
+// Re-export for convenience
 export type { ASPManagerConfig } from './asp-manager.js'
 export { ASPManager } from './asp-manager.js'
 export { createServer } from './server.js'
-export { passesSanctionsCheck, getBlocklistSize } from './sanctions.js'
 
-const BATCH_SIZE = 10_000n
+// Event sources
+export { RpcEventSource, type RpcEventSourceConfig } from './event-sources/rpc.js'
+export { SubsquidEventSource, type SubsquidEventSourceConfig } from './event-sources/subsquid.js'
 
+// Gates
+export { AllowAllGate } from './gates/allow-all.js'
+export { SanctionsGate, type SanctionsGateConfig } from './gates/sanctions.js'
+
+/**
+ * Composable ASP service configuration.
+ */
 export interface ASPServiceConfig {
-  /** RPC endpoint URL */
+  /** RPC endpoint URL (for on-chain operations: register, publishRoot) */
   rpcUrl: string
   /** ASP Registry Hub contract address */
   registryAddress: `0x${string}`
-  /** Contract address to watch (undefined = all contracts emitting this event) */
-  watchAddress?: `0x${string}`
-
-  /**
-   * ABI event definition to watch.
-   * Topic hash is derived at runtime via toEventSelector().
-   *
-   * Pass directly from a Foundry-generated ABI:
-   *   import { POOL_ABI } from '@permissionless-technologies/upp-sdk'
-   *   event: POOL_ABI.find(e => e.type === 'event' && e.name === 'Shielded')!
-   *
-   * Or parse from a string (for local dev):
-   *   import { parseAbiItem } from 'viem'
-   *   event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 value)')
-   */
-  event: AbiEvent
-
-  /**
-   * Which topic index contains the address to whitelist.
-   * 1-indexed (topic[0] is the event signature hash).
-   *
-   * Examples:
-   *   Shielded(address indexed token, address indexed depositor, ...) → addressTopicIndex: 2
-   *   Transfer(address indexed from, address indexed to, uint256 value) → addressTopicIndex: 2
-   */
-  addressTopicIndex: number
-
-  /**
-   * Optional: filter on an additional topic to narrow events.
-   * E.g., for Transfer mints only: { index: 1, value: '0x000...000' } (from = zero)
-   */
-  filterTopic?: { index: number; value: string }
-
   /** Private key for the ASP operator */
   operatorPrivateKey: `0x${string}`
+
+  /** Event source — where candidate addresses come from */
+  eventSource: IEventSource
+
+  /** Membership gate — decides who gets whitelisted */
+  gate: IMembershipGate
+
   /** ASP ID (if already registered; omit to auto-register) */
   aspId?: bigint
   /** ASP name (used when auto-registering) */
@@ -79,21 +52,12 @@ export interface ASPServiceConfig {
   port?: number
   /** Chain ID (default: auto-detect) */
   chainId?: number
-  /** Block to start indexing from (default: 0) */
-  deployBlock?: bigint
-  /**
-   * Indexer mode:
-   *   rpc — viem getLogs for history (best for local/Anvil)
-   *   subsquid — Subsquid archive for history (best for Sepolia/mainnet)
-   * Default: 'rpc'
-   */
-  indexer?: 'rpc' | 'subsquid'
-  /** Subsquid archive URL (required when indexer='subsquid') */
-  subsquidArchive?: string
 }
 
 /**
  * Start an auto-whitelist ASP service.
+ *
+ * Wires together the event source, membership gate, and API server.
  *
  * @returns The ASPManager instance (for programmatic access)
  */
@@ -102,11 +66,12 @@ export async function startASPService(config: ASPServiceConfig): Promise<ASPMana
     rpcUrl,
     registryAddress,
     operatorPrivateKey,
+    eventSource,
+    gate,
     aspId,
     aspName,
     port = 3001,
     chainId,
-    indexer = 'rpc',
   } = config
 
   const manager = new ASPManager({
@@ -121,174 +86,38 @@ export async function startASPService(config: ASPServiceConfig): Promise<ASPMana
   await manager.initialize()
   createServer(manager, port)
 
-  // Compute topic hash from event ABI
-  const topicHash = toEventSelector(config.event)
-  console.log(`\nEvent: ${config.event.name} → topic0: ${topicHash}`)
-  console.log(`Watching: ${config.watchAddress ?? 'all contracts'}, extracting address from topic[${config.addressTopicIndex}]`)
+  console.log(`\nEvent source: ${eventSource.getStatus().sourceName}`)
+  console.log(`Membership gate: ${gate.name}`)
 
-  if (indexer === 'subsquid') {
-    await startSubsquidIndexer(manager, config, topicHash)
-  } else {
-    await startRpcIndexer(manager, config, topicHash)
-  }
+  // Wire: event source → gate → manager
+  await eventSource.start(async (address: `0x${string}`) => {
+    const approved = await gate.approve(address)
+    if (!approved) return
 
-  return manager
-}
-
-// ============================================================================
-// Extract address from log topic
-// ============================================================================
-
-function extractAddress(topics: string[], addressTopicIndex: number): Address | null {
-  const topic = topics[addressTopicIndex]
-  if (!topic || topic.length < 42) return null
-  try {
-    return getAddress('0x' + topic.slice(26)) as Address
-  } catch {
-    return null
-  }
-}
-
-// ============================================================================
-// RPC Indexer (viem getLogs + watchEvent)
-// ============================================================================
-
-async function startRpcIndexer(manager: ASPManager, config: ASPServiceConfig, _topicHash: string) {
-  const { watchAddress, event, addressTopicIndex, deployBlock = 0n } = config
-
-  console.log(`\n[RPC] Catching up on historical events...`)
-  const latestBlock = await manager.publicClient.getBlockNumber()
-
-  let fromBlock = deployBlock
-  let total = 0
-
-  while (fromBlock <= latestBlock) {
-    const toBlock = fromBlock + BATCH_SIZE - 1n > latestBlock
-      ? latestBlock
-      : fromBlock + BATCH_SIZE - 1n
-
-    const logs = await manager.publicClient.getLogs({
-      address: watchAddress as Address | undefined,
-      event: event as any,
-      fromBlock,
-      toBlock,
-    })
-
-    const addresses: Address[] = []
-    for (const log of logs) {
-      // Apply filter topic if configured
-      if (config.filterTopic) {
-        const filterValue = (log as any).topics?.[config.filterTopic.index]
-        if (filterValue !== config.filterTopic.value) continue
-      }
-
-      const addr = extractAddress((log as any).topics ?? [], addressTopicIndex)
-      if (addr) addresses.push(addr)
-    }
-
-    if (addresses.length > 0) {
-      total += await manager.addAddresses(addresses)
-    }
-
-    fromBlock = toBlock + 1n
-  }
-
-  console.log(`[RPC] Historical catch-up complete: ${total} unique addresses whitelisted`)
-  manager.setCatchingUp(false)
-  await manager.publishRootIfChanged()
-
-  // Live watcher
-  console.log(`[RPC] Watching for live events...`)
-  manager.publicClient.watchContractEvent({
-    address: watchAddress as Address | undefined,
-    abi: [event] as any,
-    eventName: event.name,
-    onLogs: async (logs) => {
-      for (const log of logs) {
-        if (config.filterTopic) {
-          const filterValue = (log as any).topics?.[config.filterTopic.index]
-          if (filterValue !== config.filterTopic.value) continue
-        }
-
-        const addr = extractAddress((log as any).topics ?? [], addressTopicIndex)
-        if (!addr) continue
-
-        const isNew = await manager.addAddress(addr)
-        if (isNew) {
-          console.log(`[Live] New address: ${addr}`)
-          await manager.publishRootIfChanged()
-        }
-      }
-    },
-  })
-
-  console.log('Auto-whitelist ASP is running. Press Ctrl+C to stop.')
-}
-
-// ============================================================================
-// Subsquid Indexer
-// ============================================================================
-
-async function startSubsquidIndexer(manager: ASPManager, config: ASPServiceConfig, topicHash: string) {
-  const { watchAddress, addressTopicIndex, rpcUrl, subsquidArchive, deployBlock = 0n } = config
-
-  if (!subsquidArchive) {
-    throw new Error('subsquidArchive URL required when indexer="subsquid"')
-  }
-
-  const { EvmBatchProcessor } = await import('@subsquid/evm-processor')
-
-  const processor = new EvmBatchProcessor()
-    .setGateway(subsquidArchive)
-    .setRpcEndpoint(rpcUrl)
-    .setFinalityConfirmation(10)
-    .setBlockRange({ from: Number(deployBlock) })
-
-  // Build log filter
-  const logFilter: Record<string, any> = { topic0: [topicHash] }
-  if (watchAddress) logFilter.address = [watchAddress.toLowerCase()]
-  if (config.filterTopic) {
-    logFilter[`topic${config.filterTopic.index}`] = [config.filterTopic.value]
-  }
-
-  processor.addLog(logFilter)
-  processor.setFields({ log: { topics: true, data: true } })
-
-  console.log(`\n[Subsquid] Starting processor...`)
-
-  const inMemoryStore = {
-    async connect() {
-      return { hash: '0x', height: Number(deployBlock) || 0 }
-    },
-    async transact(_info: any, cb: (store: any) => Promise<void>) {
-      await cb({})
-    },
-  }
-
-  processor.run(inMemoryStore as any, async (ctx: any) => {
-    const addresses: Address[] = []
-
-    for (const block of ctx.blocks) {
-      for (const log of block.logs) {
-        const addr = extractAddress(log.topics ?? [], addressTopicIndex)
-        if (addr) addresses.push(addr)
-      }
-    }
-
-    if (addresses.length > 0) {
-      const added = await manager.addAddresses(addresses)
-      if (added > 0) {
-        const lastBlock = ctx.blocks[ctx.blocks.length - 1]?.header?.height ?? '?'
-        console.log(`[Subsquid] Block ${lastBlock}: +${added} new (${manager.getWhitelistedAddresses().length} total)`)
-      }
-    }
-
-    if (ctx.isHead) {
-      if (manager.getStatus().isCatchingUp) {
-        manager.setCatchingUp(false)
-        console.log(`\n[Subsquid] Historical catch-up complete: ${manager.getWhitelistedAddresses().length} unique addresses`)
-      }
+    const isNew = await manager.addAddress(address)
+    if (isNew && !eventSource.getStatus().isCatchingUp) {
+      console.log(`[Live] New address: ${address}`)
       await manager.publishRootIfChanged()
     }
   })
+
+  // After RPC catch-up completes (start() resolves), publish root
+  if (!eventSource.getStatus().isCatchingUp) {
+    manager.setCatchingUp(false)
+    await manager.publishRootIfChanged()
+  }
+
+  // For Subsquid (async catch-up), poll until done
+  if (eventSource.getStatus().isCatchingUp) {
+    const check = setInterval(async () => {
+      if (!eventSource.getStatus().isCatchingUp) {
+        manager.setCatchingUp(false)
+        await manager.publishRootIfChanged()
+        clearInterval(check)
+      }
+    }, 2000)
+  }
+
+  console.log('Auto-whitelist ASP is running. Press Ctrl+C to stop.')
+  return manager
 }
