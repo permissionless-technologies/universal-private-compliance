@@ -1,6 +1,6 @@
 {
   "name": "@permissionless-technologies/upc-asp-whitelist",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Auto-whitelist ASP service — watches on-chain events and automatically whitelists addresses after sanctions screening",
   "type": "module",
   "main": "./dist/index.cjs",

@@ -16,6 +16,15 @@ import type { ASPManager } from './asp-manager.js'
 export function createServer(manager: ASPManager, port: number) {
   const app = express()
 
+  // CORS — allow all origins (read-only public API)
+  app.use((_req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    if (_req.method === 'OPTIONS') { res.sendStatus(204); return }
+    next()
+  })
+
   app.get('/root', async (_req, res) => {
     try {
       const root = await manager.provider.getRoot()
@@ -55,6 +64,11 @@ export function createServer(manager: ASPManager, port: number) {
 
   app.get('/status', (_req, res) => {
     res.json(manager.getStatus())
+  })
+
+  // Health check for load balancers (ALB, etc.)
+  app.get('/health', (_req, res) => {
+    res.sendStatus(200)
   })
 
   app.listen(port, () => {
