@@ -89,7 +89,7 @@ async function main() {
         const added = await manager.addAddresses(mintAddresses)
         if (added > 0) {
           const lastBlock = ctx.blocks[ctx.blocks.length - 1]?.header?.height ?? '?'
-          console.log(`Block ${lastBlock}: +${added} new minters (${manager.getWhitelistedAddresses().length} total)`)
+          console.log(`Block ${lastBlock}: +${added} new minters (${manager.memberCount} total)`)
         }
       }
 
@@ -97,7 +97,7 @@ async function main() {
       if (ctx.isHead) {
         if (manager.getStatus().isCatchingUp) {
           manager.setCatchingUp(false)
-          console.log(`\nHistorical catch-up complete: ${manager.getWhitelistedAddresses().length} unique minters`)
+          console.log(`\nHistorical catch-up complete: ${manager.memberCount} unique minters`)
         }
         // Publish root on every head block batch
         await manager.publishRootIfChanged()

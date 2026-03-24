@@ -5,14 +5,17 @@
  * should return these response shapes from the standard endpoints.
  *
  * Standard endpoints:
- *   GET /root           → ASPRootResponse
- *   GET /proof/:address → ASPProofResponse (404 if not a member)
- *   GET /members        → ASPMembersResponse
- *   GET /status         → ASPStatusResponse
+ *   GET /root              → ASPRootResponse
+ *   GET /proof/:address    → ASPProofResponse (EIP-712 gated, 404 if not a member)
+ *   GET /status            → ASPStatusResponse (global stats)
+ *   GET /status/:address   → ASPAddressStatusResponse (per-address, rate-limited)
  *
  * Standard error responses:
  *   400 → { error: "Invalid address" }
+ *   401 → { error: "Missing sig or timestamp" }
+ *   403 → { error: "Invalid signature" }
  *   404 → { error: "Address not whitelisted" }
+ *   429 → { error: "Rate limit exceeded" }
  *   500 → { error: "<description>" }
  */
 
@@ -37,15 +40,22 @@ export interface ASPProofResponse {
 }
 
 /**
- * Response for GET /members
+ * Per-address compliance status.
  */
-export interface ASPMembersResponse {
-  /** All whitelisted addresses (checksummed hex) */
-  members: string[]
+export type ASPAddressStatus = 'whitelisted' | 'pending' | 'blocked' | 'unknown'
+
+/**
+ * Response for GET /status/:address (public, rate-limited)
+ */
+export interface ASPAddressStatusResponse {
+  /** Checksummed address */
+  address: string
+  /** Compliance status */
+  status: ASPAddressStatus
 }
 
 /**
- * Response for GET /status
+ * Response for GET /status (global)
  */
 export interface ASPStatusResponse {
   /** Number of whitelisted members */

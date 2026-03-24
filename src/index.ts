@@ -55,9 +55,21 @@ export type {
   MembershipGateStats,
   ASPRootResponse,
   ASPProofResponse,
-  ASPMembersResponse,
+  ASPAddressStatus,
+  ASPAddressStatusResponse,
   ASPStatusResponse,
   ASPErrorResponse,
+} from './asp/index.js'
+
+// ASP EIP-712 & Signature Helpers
+export {
+  ASP_EIP712_DOMAIN,
+  ASP_EIP712_TYPES,
+  ASP_SIGNATURE_MAX_AGE_SECONDS,
+  buildASPSignatureMessage,
+  getCachedSignature,
+  cacheSignature,
+  appendSignatureParams,
 } from './asp/index.js'
 
 // Contract ABIs

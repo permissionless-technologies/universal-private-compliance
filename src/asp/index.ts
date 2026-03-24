@@ -15,7 +15,23 @@ export type { IMembershipGate, MembershipGateStats } from './membership-gate.js'
 export type {
   ASPRootResponse,
   ASPProofResponse,
-  ASPMembersResponse,
+  ASPAddressStatus,
+  ASPAddressStatusResponse,
   ASPStatusResponse,
   ASPErrorResponse,
 } from './api-schema.js'
+
+// EIP-712 — Signature constants for gated endpoints
+export {
+  ASP_EIP712_DOMAIN,
+  ASP_EIP712_TYPES,
+  ASP_SIGNATURE_MAX_AGE_SECONDS,
+} from './eip712.js'
+
+// Signature helpers — Non-React utilities for EIP-712 signing
+export {
+  buildASPSignatureMessage,
+  getCachedSignature,
+  cacheSignature,
+  appendSignatureParams,
+} from './signature.js'

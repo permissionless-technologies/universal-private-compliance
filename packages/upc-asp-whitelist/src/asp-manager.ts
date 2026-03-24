@@ -43,6 +43,7 @@ export class ASPManager {
   readonly walletClient: WalletClient
 
   private syncedAddresses = new Set<string>()
+  private pendingAddresses = new Set<string>()
   private blockedAddresses = new Set<string>()
   private isCatchingUp = true
   private lastPublishedRoot = 0n
@@ -111,6 +112,7 @@ export class ASPManager {
     const identity = computeIdentityFromAddress(address)
     await this.provider.addMember(identity)
     this.syncedAddresses.add(normalized)
+    this.pendingAddresses.add(normalized)
     this.dirty = true
     return true
   }
@@ -167,6 +169,7 @@ export class ASPManager {
     try {
       const hash = await this.client.publishRoot({ walletClient: this.walletClient })
       this.lastPublishedRoot = currentRoot
+      this.pendingAddresses.clear()
       this.dirty = false
       console.log(`Published root (${this.syncedAddresses.size} members): ${hash}`)
       return true
@@ -194,10 +197,23 @@ export class ASPManager {
   }
 
   /**
-   * Get all whitelisted addresses
+   * Get the per-address compliance status.
    */
-  getWhitelistedAddresses(): string[] {
-    return [...this.syncedAddresses]
+  getAddressStatus(address: Address): 'whitelisted' | 'pending' | 'blocked' | 'unknown' {
+    const normalized = address.toLowerCase()
+    if (this.blockedAddresses.has(normalized)) return 'blocked'
+    if (this.syncedAddresses.has(normalized)) {
+      if (this.pendingAddresses.has(normalized)) return 'pending'
+      return 'whitelisted'
+    }
+    return 'unknown'
+  }
+
+  /**
+   * Number of members in the tree.
+   */
+  get memberCount(): number {
+    return this.syncedAddresses.size
   }
 
   /**

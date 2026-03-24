@@ -5,7 +5,7 @@
  *
  *   - Event Source (IEventSource): where addresses come from
  *   - Membership Gate (IMembershipGate): who gets whitelisted
- *   - API Server: standard endpoints (/root, /proof/:addr, /members, /status)
+ *   - API Server: standard endpoints (/root, /proof/:addr, /status, /status/:addr)
  */
 
 import type { Address } from 'viem'
@@ -26,6 +26,10 @@ export { SubsquidEventSource, type SubsquidEventSourceConfig } from './event-sou
 // Gates
 export { AllowAllGate } from './gates/allow-all.js'
 export { SanctionsGate, type SanctionsGateConfig } from './gates/sanctions.js'
+
+// Middleware
+export { requireSignature } from './middleware/verify-signature.js'
+export { rateLimit, type RateLimitConfig } from './middleware/rate-limit.js'
 
 /**
  * Composable ASP service configuration.
@@ -107,7 +111,7 @@ export async function startASPService(config: ASPServiceConfig): Promise<ASPMana
   // After RPC catch-up (start() resolves for RPC source), publish once
   if (!eventSource.getStatus().isCatchingUp) {
     manager.setCatchingUp(false)
-    console.log(`Catch-up complete: ${manager.getWhitelistedAddresses().length} addresses`)
+    console.log(`Catch-up complete: ${manager.memberCount} addresses`)
     await manager.publishRootIfChanged()
   }
 
@@ -116,7 +120,7 @@ export async function startASPService(config: ASPServiceConfig): Promise<ASPMana
     const check = setInterval(async () => {
       if (!eventSource.getStatus().isCatchingUp) {
         manager.setCatchingUp(false)
-        console.log(`Catch-up complete: ${manager.getWhitelistedAddresses().length} addresses`)
+        console.log(`Catch-up complete: ${manager.memberCount} addresses`)
         await manager.publishRootIfChanged()
         clearInterval(check)
       }

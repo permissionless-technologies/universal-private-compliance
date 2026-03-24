@@ -1,22 +1,25 @@
 /**
  * API Server
  *
- * Simple Express server exposing the ASP state:
+ * Express server exposing the ASP state:
  *
- *   GET /root          → current Merkle root
- *   GET /proof/:addr   → membership proof for an address
- *   GET /members       → all whitelisted addresses
- *   GET /status        → sync status (catching up, member count, etc.)
+ *   GET /root              → current Merkle root (public)
+ *   GET /proof/:address    → membership proof (EIP-712 gated)
+ *   GET /status            → global sync status (public)
+ *   GET /status/:address   → per-address compliance status (public, rate-limited)
+ *   GET /health            → health check (public)
  */
 
 import express from 'express'
-import { type Address, isAddress } from 'viem'
+import { type Address, isAddress, getAddress } from 'viem'
 import type { ASPManager } from './asp-manager.js'
+import { requireSignature } from './middleware/verify-signature.js'
+import { rateLimit } from './middleware/rate-limit.js'
 
 export function createServer(manager: ASPManager, port: number) {
   const app = express()
 
-  // CORS — allow all origins (read-only public API)
+  // CORS — allow all origins (read-only API)
   app.use((_req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
@@ -25,6 +28,7 @@ export function createServer(manager: ASPManager, port: number) {
     next()
   })
 
+  // Public: current Merkle root
   app.get('/root', async (_req, res) => {
     try {
       const root = await manager.provider.getRoot()
@@ -34,20 +38,17 @@ export function createServer(manager: ASPManager, port: number) {
     }
   })
 
-  app.get('/proof/:address', async (req, res) => {
-    const addr = req.params.address
-    if (!addr || !isAddress(addr)) {
-      res.status(400).json({ error: 'Invalid address' })
-      return
-    }
+  // EIP-712 gated: membership proof
+  app.get('/proof/:address', requireSignature(), async (req, res) => {
+    const addr = getAddress(req.params.address) as Address
 
-    if (!manager.isWhitelisted(addr as Address)) {
+    if (!manager.isWhitelisted(addr)) {
       res.status(404).json({ error: 'Address not whitelisted' })
       return
     }
 
     try {
-      const proof = await manager.getProof(addr as Address)
+      const proof = await manager.getProof(addr)
       res.json({
         root: proof.root.toString(),
         pathElements: proof.pathElements.map(e => e.toString()),
@@ -58,25 +59,37 @@ export function createServer(manager: ASPManager, port: number) {
     }
   })
 
-  app.get('/members', (_req, res) => {
-    res.json({ members: manager.getWhitelistedAddresses() })
+  // Public + rate-limited: per-address compliance status
+  app.get('/status/:address', rateLimit({ maxRequests: 20, windowSeconds: 60 }), (req, res) => {
+    const addr = req.params.address
+    if (!addr || !isAddress(addr)) {
+      res.status(400).json({ error: 'Invalid address' })
+      return
+    }
+
+    const checksummed = getAddress(addr)
+    res.json({
+      address: checksummed,
+      status: manager.getAddressStatus(checksummed as Address),
+    })
   })
 
+  // Public: global sync status
   app.get('/status', (_req, res) => {
     res.json(manager.getStatus())
   })
 
-  // Health check for load balancers (ALB, etc.)
+  // Health check for load balancers
   app.get('/health', (_req, res) => {
     res.sendStatus(200)
   })
 
   app.listen(port, () => {
     console.log(`ASP API server listening on http://localhost:${port}`)
-    console.log(`  GET /root          → current Merkle root`)
-    console.log(`  GET /proof/:addr   → membership proof`)
-    console.log(`  GET /members       → all whitelisted addresses`)
-    console.log(`  GET /status        → sync status`)
+    console.log(`  GET /root              → current Merkle root`)
+    console.log(`  GET /proof/:addr       → membership proof (EIP-712 gated)`)
+    console.log(`  GET /status            → global sync status`)
+    console.log(`  GET /status/:addr      → per-address status (rate-limited)`)
   })
 
   return app
