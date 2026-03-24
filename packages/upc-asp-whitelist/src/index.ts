@@ -92,30 +92,35 @@ export async function startASPService(config: ASPServiceConfig): Promise<ASPMana
   // Wire: event source → gate → manager
   await eventSource.start(async (address: `0x${string}`) => {
     const approved = await gate.approve(address)
-    if (!approved) return
+    if (!approved) {
+      manager.markBlocked(address)
+      return
+    }
 
     const isNew = await manager.addAddress(address)
     if (isNew && !eventSource.getStatus().isCatchingUp) {
       console.log(`[Live] New address: ${address}`)
-      await manager.publishRootIfChanged()
+      manager.schedulePublish() // debounced — at most once per 30s
     }
   })
 
-  // After RPC catch-up completes (start() resolves), publish root
+  // After RPC catch-up (start() resolves for RPC source), publish once
   if (!eventSource.getStatus().isCatchingUp) {
     manager.setCatchingUp(false)
+    console.log(`Catch-up complete: ${manager.getWhitelistedAddresses().length} addresses`)
     await manager.publishRootIfChanged()
   }
 
-  // For Subsquid (async catch-up), poll until done
+  // For Subsquid (async catch-up), poll until done then publish once
   if (eventSource.getStatus().isCatchingUp) {
     const check = setInterval(async () => {
       if (!eventSource.getStatus().isCatchingUp) {
         manager.setCatchingUp(false)
+        console.log(`Catch-up complete: ${manager.getWhitelistedAddresses().length} addresses`)
         await manager.publishRootIfChanged()
         clearInterval(check)
       }
-    }, 2000)
+    }, 5000)
   }
 
   console.log('Auto-whitelist ASP is running. Press Ctrl+C to stop.')

@@ -4,7 +4,7 @@
  * Shared logic for the auto-whitelist ASP:
  * - MemoryProvider for in-memory member storage
  * - Proof generation for API consumers
- * - Root publishing on-chain
+ * - Root publishing on-chain (debounced to avoid nonce conflicts)
  *
  * Used by both the local (viem) and Sepolia (Subsquid) entry points.
  */
@@ -16,7 +16,6 @@ import {
   type ASPClient,
   type MembershipProof,
 } from '@permissionless-technologies/upc-sdk'
-import { passesSanctionsCheck, getBlocklistSize } from './sanctions.js'
 import {
   createPublicClient,
   createWalletClient,
@@ -47,6 +46,10 @@ export class ASPManager {
   private blockedAddresses = new Set<string>()
   private isCatchingUp = true
   private lastPublishedRoot = 0n
+  private isPublishing = false
+  private publishTimer: ReturnType<typeof setTimeout> | null = null
+  private dirty = false
+  private readonly PUBLISH_INTERVAL_MS = 30_000 // at most once per 30 seconds
 
   constructor(private config: ASPManagerConfig) {
     const chain = config.chainId === 11155111 ? sepolia : foundry
@@ -95,31 +98,32 @@ export class ASPManager {
   }
 
   /**
-   * Add an address to the whitelist after sanctions screening.
-   * Converts the address to an identity commitment and adds it to the Merkle tree.
+   * Add an address to the whitelist.
+   * Does NOT publish the root — call schedulePublish() or publishRootIfChanged() separately.
    *
-   * @returns true if the address was new and passed sanctions check
+   * @returns true if the address was new
    */
   async addAddress(address: Address): Promise<boolean> {
     const normalized = address.toLowerCase()
     if (this.syncedAddresses.has(normalized)) return false
     if (this.blockedAddresses.has(normalized)) return false
 
-    // Sanctions check — in production, this queries a real database
-    if (!passesSanctionsCheck(address)) {
-      this.blockedAddresses.add(normalized)
-      console.log(`BLOCKED: ${address} failed sanctions check`)
-      return false
-    }
-
     const identity = computeIdentityFromAddress(address)
     await this.provider.addMember(identity)
     this.syncedAddresses.add(normalized)
+    this.dirty = true
     return true
   }
 
   /**
-   * Add multiple addresses in batch (for historical catch-up)
+   * Mark an address as blocked (failed gate check)
+   */
+  markBlocked(address: Address): void {
+    this.blockedAddresses.add(address.toLowerCase())
+  }
+
+  /**
+   * Add multiple addresses in batch
    */
   async addAddresses(addresses: Address[]): Promise<number> {
     let added = 0
@@ -130,21 +134,47 @@ export class ASPManager {
   }
 
   /**
-   * Publish the current Merkle root on-chain (if it changed)
+   * Schedule a debounced root publish.
+   * Collects changes and publishes at most once per PUBLISH_INTERVAL_MS.
+   * Waits for any in-flight publish to complete before starting another.
+   */
+  schedulePublish(): void {
+    if (!this.dirty) return
+    if (this.publishTimer) return // already scheduled
+
+    this.publishTimer = setTimeout(async () => {
+      this.publishTimer = null
+      await this.publishRootIfChanged()
+    }, this.PUBLISH_INTERVAL_MS)
+  }
+
+  /**
+   * Publish the current Merkle root on-chain (if changed).
+   * Serializes publishes — waits for in-flight tx before sending another.
    */
   async publishRootIfChanged(): Promise<boolean> {
     const currentRoot = await this.provider.getRoot()
     if (currentRoot === this.lastPublishedRoot) return false
     if (currentRoot === 0n) return false
 
+    // Wait for any in-flight publish to complete
+    if (this.isPublishing) {
+      this.dirty = true // will be picked up by next schedulePublish
+      return false
+    }
+
+    this.isPublishing = true
     try {
       const hash = await this.client.publishRoot({ walletClient: this.walletClient })
       this.lastPublishedRoot = currentRoot
-      console.log(`Published root: ${currentRoot} (tx: ${hash})`)
+      this.dirty = false
+      console.log(`Published root (${this.syncedAddresses.size} members): ${hash}`)
       return true
     } catch (err) {
-      console.error('Failed to publish root:', err)
+      console.error('Failed to publish root:', err instanceof Error ? err.message : err)
       return false
+    } finally {
+      this.isPublishing = false
     }
   }
 
@@ -177,7 +207,6 @@ export class ASPManager {
     return {
       memberCount: this.syncedAddresses.size,
       blockedCount: this.blockedAddresses.size,
-      blocklistSize: getBlocklistSize(),
       isCatchingUp: this.isCatchingUp,
       aspId: this.client.getASPId()?.toString() ?? null,
       lastPublishedRoot: this.lastPublishedRoot.toString(),
