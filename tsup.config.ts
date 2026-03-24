@@ -7,6 +7,7 @@ export default defineConfig({
     'src/providers/index.ts',
     'src/operator/index.ts',
     'src/react/index.ts',
+    'src/asp/index.ts',
   ],
   format: ['esm', 'cjs'],
   dts: true,

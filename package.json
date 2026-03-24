@@ -1,6 +1,6 @@
 {
   "name": "@permissionless-technologies/upc-sdk",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Universal Private Compliance SDK — Pluggable zero-knowledge attestation & ASP (Association Set Provider) framework",
   "workspaces": [
     "packages/*"
@@ -34,6 +34,11 @@
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js",
       "require": "./dist/react/index.cjs"
+    },
+    "./asp": {
+      "types": "./dist/asp/index.d.ts",
+      "import": "./dist/asp/index.js",
+      "require": "./dist/asp/index.cjs"
     }
   },
   "files": [

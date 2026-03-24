@@ -47,5 +47,18 @@ export { RESTProvider } from './providers/rest.js'
 export type { ASPEntry, ASPList, ASPType, ASPSecurityLevel } from './core/asp-list.js'
 export { parseASPList, getActiveASPs, findASPById, fetchASPProof } from './core/asp-list.js'
 
+// ASP Service Interfaces
+export type {
+  IEventSource,
+  EventSourceStatus,
+  IMembershipGate,
+  MembershipGateStats,
+  ASPRootResponse,
+  ASPProofResponse,
+  ASPMembersResponse,
+  ASPStatusResponse,
+  ASPErrorResponse,
+} from './asp/index.js'
+
 // Contract ABIs
 export { ASP_REGISTRY_HUB_ABI } from './contracts/abi/ASPRegistryHub.js'
