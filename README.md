@@ -117,6 +117,29 @@ contract MyProtocol {
 }
 ```
 
+## ASP Service Interfaces
+
+UPC defines standard interfaces for building ASP services. Implementations live in separate packages.
+
+```typescript
+import type { IEventSource, IMembershipGate } from '@permissionless-technologies/upc-sdk/asp'
+```
+
+| Interface | Purpose | Example Implementations |
+|-----------|---------|----------------------|
+| `IEventSource` | Where do addresses come from? | `RpcEventSource`, `SubsquidEventSource`, webhooks |
+| `IMembershipGate` | Who gets whitelisted? | `AllowAllGate`, `SanctionsGate`, KYC provider |
+| API Schema | Standard response types | `/root`, `/proof/:addr`, `/members`, `/status` |
+
+### Sub-packages
+
+| Package | Description |
+|---------|-------------|
+| `@permissionless-technologies/upc-sdk` | Core SDK (this package) |
+| `@permissionless-technologies/upc-asp-whitelist` | Auto-whitelist ASP service |
+| `@permissionless-technologies/upc-asp-kyc` | KYC verification ASP (planned) |
+| `@permissionless-technologies/upc-asp-sanctions` | Sanctions screening ASP (planned) |
+
 ## Custom Providers
 
 Implement `IASPProvider` to connect any storage backend:

@@ -195,6 +195,47 @@ asp.attestationRoot <== aspRootPublicInput;
 
 For protocols that can't modify their circuits, generate an independent proof and verify it on-chain via the `AttestationHub`.
 
+## ASP Service Interfaces
+
+UPC defines standard interfaces for building ASP services. These live in `src/asp/` and are available via `@permissionless-technologies/upc-sdk/asp`.
+
+### IEventSource — "Where do addresses come from?"
+
+```typescript
+interface IEventSource {
+  start(onAddress: (address: `0x${string}`) => Promise<void>): Promise<void>
+  stop(): void
+  getStatus(): EventSourceStatus
+}
+```
+
+Implementations watch on-chain events (or any other source) and produce candidate addresses. Built-in: `RpcEventSource`, `SubsquidEventSource`. Custom: webhooks, GraphQL subscriptions, manual admin input.
+
+### IMembershipGate — "Who gets whitelisted?"
+
+```typescript
+interface IMembershipGate {
+  approve(address: `0x${string}`): Promise<boolean>
+  readonly name: string
+  getStats(): MembershipGateStats
+}
+```
+
+Gates screen candidate addresses before they're added to the Merkle tree. Built-in: `AllowAllGate`, `SanctionsGate`. Custom: KYC provider API, Chainalysis integration, manual approval.
+
+### API Schema
+
+Standard response types for ASP HTTP endpoints:
+
+| Endpoint | Response Type | Description |
+|----------|--------------|-------------|
+| `GET /root` | `ASPRootResponse` | Current Merkle root |
+| `GET /proof/:address` | `ASPProofResponse` | Membership proof (404 if not member) |
+| `GET /members` | `ASPMembersResponse` | All whitelisted addresses |
+| `GET /status` | `ASPStatusResponse` | Sync status, member count |
+
+Any ASP server implementation should follow this schema regardless of the HTTP framework used.
+
 ## Revocation
 
 When a member is removed:

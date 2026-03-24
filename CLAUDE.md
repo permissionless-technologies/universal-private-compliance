@@ -19,18 +19,32 @@ This file provides guidance to Claude Code when working with the Universal Priva
 ```
 universal-private-compliance/
 ├── src/
-│   ├── core/            # Core SDK: tree, proof, identity, client, types
+│   ├── core/            # Core SDK: tree, proof, identity, client, types, hash
+│   ├── asp/             # ASP service interfaces: IEventSource, IMembershipGate, API schema
 │   ├── providers/       # IASPProvider + built-in implementations
 │   ├── operator/        # ASP operator tools (tree management, root publishing)
 │   ├── contracts/       # Solidity contracts + ABIs
 │   │   ├── interfaces/  # IAttestationVerifier, IASPRegistry
-│   │   └── src/         # AttestationHub, ASPRegistryHub, verifier adapters
-│   ├── circuits/        # Circom membership proof templates
+│   │   └── src/         # AttestationHub, ASPRegistryHub, BLS12381, PlonkVerifier, adapters
+│   ├── circuits/        # Circom membership proof templates (bn254/ + bls12381/)
 │   ├── react/           # Optional React hooks
 │   └── index.ts         # Public exports
-├── examples/            # Example integrations
+├── packages/
+│   └── upc-asp-whitelist/  # Auto-whitelist ASP service (@permissionless-technologies/upc-asp-whitelist)
+├── deployments/         # Per-chain contract addresses + ASP lists
 ├── docs/                # Markdown documentation
 └── test/                # Vitest tests
+```
+
+## Subpath Exports
+
+```
+@permissionless-technologies/upc-sdk          # Main entry (everything)
+@permissionless-technologies/upc-sdk/core     # Core: tree, proof, hash, identity
+@permissionless-technologies/upc-sdk/asp      # ASP service interfaces
+@permissionless-technologies/upc-sdk/providers # Storage providers
+@permissionless-technologies/upc-sdk/operator  # Operator tools
+@permissionless-technologies/upc-sdk/react    # React hooks (optional)
 ```
 
 ## Build Commands
@@ -68,14 +82,24 @@ npm run lint    # Lint code
 - TypeScript strict mode
 - React hooks are optional — core SDK works without React
 
+## ASP Service Interfaces (src/asp/)
+
+Standard interfaces for building ASP services:
+- `IEventSource` — "Where do addresses come from?" (RPC, Subsquid, webhook, custom)
+- `IMembershipGate` — "Who gets whitelisted?" (AllowAll, Sanctions, KYC, custom)
+- API Schema — Standard response types for `/root`, `/proof/:addr`, `/members`, `/status`
+
+These are type-only exports. Implementations live in sub-packages (e.g., `upc-asp-whitelist`).
+
 ## Consumers
 
 - `upp-sdk` — imports core proof generation and provider interface
-- `zkdemo-app` — imports React hooks and LocalStorageProvider for demo UI
+- `zkdemo-app` — imports React hooks for ASP status display
+- `upc-asp-whitelist` — implements IEventSource + IMembershipGate for auto-whitelisting
 
 ## Relationship to UPP SDK
 
-UPC handles: identity, Merkle trees, membership proofs, ASP registration, root publishing, pluggable verification.
+UPC handles: identity, Merkle trees, membership proofs, ASP registration, root publishing, pluggable verification, ASP service interfaces.
 
 UPP handles (pool-specific): origin tracking, ragequit, sourceTag, note commitments, swap orders, transfer/withdraw circuits.
 
