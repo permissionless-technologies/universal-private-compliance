@@ -42,8 +42,8 @@ template MerkleProof(levels) {
 
         // Poseidon255 for BLS12-381 (128-bit security)
         hashers[i] = Poseidon255(2);
-        hashers[i].inputs[0] <== orderMux[i].out[0];
-        hashers[i].inputs[1] <== orderMux[i].out[1];
+        hashers[i].in[0] <== orderMux[i].out[0];
+        hashers[i].in[1] <== orderMux[i].out[1];
 
         levelMux[i] = Mux1();
         levelMux[i].c[0] <== hashers[i].out;
