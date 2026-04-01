@@ -3,8 +3,10 @@
 /**
  * React hook for fetching ASP membership proofs.
  *
- * The /proof/:address endpoint is EIP-712 gated — only the address owner
- * can fetch their proof. This hook handles signing and caching automatically.
+ * The /proof/:address endpoint is public (rate-limited). Any wallet can
+ * fetch a proof for any whitelisted address — this is required because
+ * the note's origin may differ from the connected wallet (e.g., received
+ * notes preserve the original depositor's origin).
  *
  * Usage:
  *   const { fetchProof, proof, isLoading } = useASPProof({
@@ -14,14 +16,7 @@
  */
 
 import { useState, useCallback } from 'react'
-import { useAccount, useSignTypedData } from 'wagmi'
 import { getAddress } from 'viem'
-import {
-  buildASPSignatureMessage,
-  getCachedSignature,
-  cacheSignature,
-  appendSignatureParams,
-} from '../asp/signature.js'
 
 export interface ASPProofData {
   /** ASP ID (on-chain identifier) */
@@ -42,7 +37,7 @@ export interface UseASPProofConfig {
 }
 
 export interface UseASPProofReturn {
-  /** Fetch the proof (triggers wallet signature if needed) */
+  /** Fetch the proof for a given address */
   fetchProof: (addressOverride?: string) => Promise<ASPProofData | null>
   /** Last fetched proof */
   proof: ASPProofData | null
@@ -54,18 +49,14 @@ export interface UseASPProofReturn {
 
 export function useASPProof(config: UseASPProofConfig): UseASPProofReturn {
   const { serviceUrl, aspId } = config
-  const { address } = useAccount()
-  const { signTypedDataAsync } = useSignTypedData()
 
   const [proof, setProof] = useState<ASPProofData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const fetchProof = useCallback(async (addressOverride?: string): Promise<ASPProofData | null> => {
-    const targetAddress = addressOverride ?? address
-
-    if (!serviceUrl || !targetAddress || aspId === undefined) {
-      setError('No ASP service configured or no wallet connected')
+    if (!serviceUrl || !addressOverride || aspId === undefined) {
+      setError('No ASP service configured or no address provided')
       return null
     }
 
@@ -73,44 +64,19 @@ export function useASPProof(config: UseASPProofConfig): UseASPProofReturn {
       setIsLoading(true)
       setError(null)
 
-      const checksummed = getAddress(targetAddress)
+      const checksummed = getAddress(addressOverride)
 
-      // Check signature cache
-      let sig: `0x${string}`
-      let timestamp: number
-
-      const cached = getCachedSignature(checksummed)
-      if (cached) {
-        sig = cached.sig
-        timestamp = cached.timestamp
-      } else {
-        // Sign EIP-712 message
-        const msg = buildASPSignatureMessage(checksummed)
-        timestamp = msg.timestamp
-        sig = await signTypedDataAsync({
-          domain: msg.domain,
-          types: msg.types,
-          primaryType: msg.primaryType,
-          message: msg.message,
-        })
-        cacheSignature(checksummed, sig, timestamp)
-      }
-
-      // Fetch proof with signature
-      const url = appendSignatureParams(
-        `${serviceUrl}/proof/${checksummed}`,
-        sig,
-        timestamp,
-      )
-      const res = await fetch(url)
+      // Public endpoint — no signature needed, just fetch
+      const res = await fetch(`${serviceUrl}/proof/${checksummed}`)
 
       if (!res.ok) {
         if (res.status === 404) {
           setError('Address not whitelisted in ASP')
-        } else if (res.status === 401 || res.status === 403) {
-          setError('Signature verification failed')
+        } else if (res.status === 429) {
+          setError('Rate limit exceeded — try again in a moment')
         } else {
-          setError(`ASP returned ${res.status}`)
+          const body = await res.json().catch(() => ({}))
+          setError(body.error || `ASP returned ${res.status}`)
         }
         setProof(null)
         return null
@@ -133,18 +99,13 @@ export function useASPProof(config: UseASPProofConfig): UseASPProofReturn {
       return proofData
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to fetch proof'
-      // User rejected signature
-      if (msg.includes('rejected') || msg.includes('denied')) {
-        setError('Signature request was rejected')
-      } else {
-        setError(msg)
-      }
+      setError(msg)
       setProof(null)
       return null
     } finally {
       setIsLoading(false)
     }
-  }, [serviceUrl, aspId, address, signTypedDataAsync])
+  }, [serviceUrl, aspId])
 
   return { fetchProof, proof, isLoading, error }
 }

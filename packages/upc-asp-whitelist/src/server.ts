@@ -4,16 +4,20 @@
  * Express server exposing the ASP state:
  *
  *   GET /root              → current Merkle root (public)
- *   GET /proof/:address    → membership proof (EIP-712 gated)
+ *   GET /proof/:address    → membership proof (rate-limited, public)
  *   GET /status            → global sync status (public)
  *   GET /status/:address   → per-address compliance status (public, rate-limited)
  *   GET /health            → health check (public)
+ *
+ * The proof endpoint is public because Merkle proofs are not secret — they prove
+ * membership in a publicly-committed tree. Callers need proofs for addresses they
+ * don't control (e.g., withdrawing a note whose origin is a different wallet).
+ * Rate limiting prevents enumeration of the full member set.
  */
 
 import express from 'express'
 import { type Address, isAddress, getAddress } from 'viem'
 import type { ASPManager } from './asp-manager.js'
-import { requireSignature } from './middleware/verify-signature.js'
 import { rateLimit } from './middleware/rate-limit.js'
 
 export function createServer(manager: ASPManager, port: number) {
@@ -38,17 +42,25 @@ export function createServer(manager: ASPManager, port: number) {
     }
   })
 
-  // EIP-712 gated: membership proof
-  app.get('/proof/:address', requireSignature(), async (req, res) => {
-    const addr = getAddress(req.params.address) as Address
+  // Public + rate-limited: membership proof
+  // Proofs are public data (Merkle siblings from a publicly-committed root).
+  // Any wallet may need a proof for a note's origin address during withdrawal.
+  app.get('/proof/:address', rateLimit({ maxRequests: 30, windowSeconds: 60 }), async (req, res) => {
+    const addr = req.params.address
+    if (!addr || !isAddress(addr)) {
+      res.status(400).json({ error: 'Invalid address' })
+      return
+    }
 
-    if (!manager.isWhitelisted(addr)) {
+    const checksummed = getAddress(addr) as Address
+
+    if (!manager.isWhitelisted(checksummed)) {
       res.status(404).json({ error: 'Address not whitelisted' })
       return
     }
 
     try {
-      const proof = await manager.getProof(addr)
+      const proof = await manager.getProof(checksummed)
       res.json({
         root: proof.root.toString(),
         pathElements: proof.pathElements.map(e => e.toString()),
@@ -87,7 +99,7 @@ export function createServer(manager: ASPManager, port: number) {
   app.listen(port, () => {
     console.log(`ASP API server listening on http://localhost:${port}`)
     console.log(`  GET /root              → current Merkle root`)
-    console.log(`  GET /proof/:addr       → membership proof (EIP-712 gated)`)
+    console.log(`  GET /proof/:addr       → membership proof (rate-limited)`)
     console.log(`  GET /status            → global sync status`)
     console.log(`  GET /status/:addr      → per-address status (rate-limited)`)
   })
