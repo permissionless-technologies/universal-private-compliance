@@ -1,0 +1,44 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+
+      # Determine which package to publish from the release tag
+      # release-please tags: @permissionless-technologies/upc-sdk-v0.3.3
+      #                  or: @permissionless-technologies/upc-asp-whitelist-v0.5.2
+      - name: Determine package
+        id: pkg
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          if [[ "$TAG" == *"upc-asp-whitelist"* ]]; then
+            echo "dir=packages/upc-asp-whitelist" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=." >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        run: npm run build
+        working-directory: ${{ steps.pkg.outputs.dir }}
+
+      - name: Publish with provenance
+        run: npm publish --provenance --access public
+        working-directory: ${{ steps.pkg.outputs.dir }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
