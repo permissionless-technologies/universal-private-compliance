@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.1](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-sdk-v0.4.0...upc-sdk-v0.4.1) (2026-04-10)
+
+
+### Bug Fixes
+
+* **ci:** drop registry-url from publish jobs ([ca70350](https://github.com/permissionless-technologies/universal-private-compliance/commit/ca703507caf9f4a1f56667975dee73d996e081c5))
+* **ci:** restore registry-url and NPM_TOKEN for publish jobs ([3f99e2e](https://github.com/permissionless-technologies/universal-private-compliance/commit/3f99e2e5044351a64f0884d5f24e01b1cdacf016))
+* **ci:** updated README to reflect release flow ([c029c9b](https://github.com/permissionless-technologies/universal-private-compliance/commit/c029c9be8a577f68e71dd8e0ec38690067c1da4d))
+* **ci:** use correct output key for root release ([9ccd849](https://github.com/permissionless-technologies/universal-private-compliance/commit/9ccd8491062116a28fd1c88c655b4d68ff87e7ea))
+* updated release-please workflow to work with github OIDC ([3930930](https://github.com/permissionless-technologies/universal-private-compliance/commit/3930930f600d263c785b3564278af477afc84eea))
+
 ## [0.4.0](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-sdk-v0.3.2...upc-sdk-v0.4.0) (2026-04-09)
 
 
