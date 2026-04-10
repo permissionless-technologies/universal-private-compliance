@@ -170,6 +170,17 @@ class MyDatabaseProvider implements IASPProvider {
 - [Running an ASP Service](docs/running-an-asp.md)
 - [Protocol Integration](docs/integration.md)
 
+
+## CI/CD Pipeline
+
+This repository uses an automated release pipeline:
+
+1. **Commit enforcement** — Conventional commits via commitlint + husky
+2. **CI checks** — TypeScript typecheck, vitest, build, and Forge tests run on every PR
+3. **Automated releases** — [release-please](https://github.com/googleapis/release-please) opens a Release PR with version bumps and changelogs when `feat:` or `fix:` commits land on `main`
+4. **npm publish** — Merging the Release PR publishes to npm with [Sigstore provenance](https://docs.npmjs.com/generating-provenance-statements) via OIDC Trusted Publishing (no stored secrets)
+
+
 ## License
 
 See [LICENSE](LICENSE) file.
