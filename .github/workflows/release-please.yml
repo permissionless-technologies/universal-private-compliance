@@ -40,11 +40,13 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          # no registry-url — let npm use OIDC Trusted Publishing
+          registry-url: https://registry.npmjs.org
       - run: npm ci
       - run: npm run build
       - name: Publish with provenance
         run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-asp-whitelist:
     needs: release-please
@@ -60,10 +62,12 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          # no registry-url — let npm use OIDC Trusted Publishing
+          registry-url: https://registry.npmjs.org
       - run: npm ci
       - run: npm run build
         working-directory: packages/upc-asp-whitelist
       - name: Publish with provenance
         run: npm publish --provenance --access public
         working-directory: packages/upc-asp-whitelist
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
