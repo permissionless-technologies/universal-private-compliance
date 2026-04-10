@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       releases_created: ${{ steps.release.outputs.releases_created }}
-      root_release_created: ${{ steps.release.outputs['.--release_created'] }}
+      root_release_created: ${{ steps.release.outputs.release_created }}
       whitelist_release_created: ${{ steps.release.outputs['packages/upc-asp-whitelist--release_created'] }}
     steps:
       - uses: googleapis/release-please-action@v4
