@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-sdk-v0.4.1...upc-sdk-v0.4.2) (2026-04-10)
+
+
+### Bug Fixes
+
+* added repository url to package.json ([fed3c56](https://github.com/permissionless-technologies/universal-private-compliance/commit/fed3c5678ac4e3a12f13a2c76eb8aeee6e55b21e))
+
 ## [0.4.1](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-sdk-v0.4.0...upc-sdk-v0.4.1) (2026-04-10)
 
 
