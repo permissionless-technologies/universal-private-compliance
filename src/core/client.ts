@@ -147,6 +147,40 @@ export class ASPClient {
   }
 
   /**
+   * Publish a STARK-side Merkle root on-chain.
+   *
+   * The STARK side maintains a parallel tree (typically over the same
+   * membership set) using a STARK-friendly hash (e.g., Poseidon31). The
+   * root is supplied by the caller because the SNARK provider doesn't
+   * compute it — the caller is expected to manage a `MerkleTree` with a
+   * `PoseidonM31` hash and pass its root here.
+   *
+   * Operators MUST publish in lock-step with the SNARK root so both
+   * proof systems stay aligned (an attacker who can update only one of
+   * the two roots can keep the other stale and bypass compliance on
+   * one path).
+   */
+  async publishStarkRoot(
+    starkRoot: bigint,
+    options: PublishRootOptions,
+  ): Promise<`0x${string}`> {
+    if (!this.aspId) {
+      throw new Error('ASP not registered. Call register() first or set aspId.')
+    }
+
+    const walletClient = options.walletClient as any
+
+    const hash = await walletClient.writeContract({
+      address: this.registryAddress,
+      abi: ASP_REGISTRY_HUB_ABI,
+      functionName: 'updateStarkRoot',
+      args: [this.aspId, starkRoot],
+    })
+
+    return hash as `0x${string}`
+  }
+
+  /**
    * Check if a root is valid on-chain (current or historical)
    */
   async isValidRoot(root: bigint): Promise<boolean> {
@@ -161,6 +195,20 @@ export class ASPClient {
   }
 
   /**
+   * Check if a STARK-side root is valid on-chain (current or historical).
+   */
+  async isValidStarkRoot(starkRoot: bigint): Promise<boolean> {
+    if (!this.aspId) return false
+
+    return this.publicClient.readContract({
+      address: this.registryAddress,
+      abi: ASP_REGISTRY_HUB_ABI,
+      functionName: 'isValidSTARKRoot',
+      args: [this.aspId, starkRoot],
+    }) as Promise<boolean>
+  }
+
+  /**
    * Get the current on-chain root
    */
   async getCurrentOnChainRoot(): Promise<bigint> {
@@ -170,6 +218,20 @@ export class ASPClient {
       address: this.registryAddress,
       abi: ASP_REGISTRY_HUB_ABI,
       functionName: 'getCurrentRoot',
+      args: [this.aspId],
+    }) as Promise<bigint>
+  }
+
+  /**
+   * Get the current on-chain STARK root.
+   */
+  async getCurrentOnChainStarkRoot(): Promise<bigint> {
+    if (!this.aspId) return 0n
+
+    return this.publicClient.readContract({
+      address: this.registryAddress,
+      abi: ASP_REGISTRY_HUB_ABI,
+      functionName: 'getCurrentStarkRoot',
       args: [this.aspId],
     }) as Promise<bigint>
   }

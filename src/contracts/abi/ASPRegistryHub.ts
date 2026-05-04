@@ -38,8 +38,27 @@ export const ASP_REGISTRY_HUB_ABI = [
       { "name": "operator", "type": "address", "internalType": "address" },
       { "name": "name", "type": "string", "internalType": "string" },
       { "name": "currentRoot", "type": "uint256", "internalType": "uint256" },
-      { "name": "lastUpdated", "type": "uint256", "internalType": "uint256" }
+      { "name": "lastUpdated", "type": "uint256", "internalType": "uint256" },
+      { "name": "currentStarkRoot", "type": "uint256", "internalType": "uint256" },
+      { "name": "lastStarkUpdated", "type": "uint256", "internalType": "uint256" }
     ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "aspStarkRootHistory",
+    "inputs": [
+      { "name": "", "type": "uint256", "internalType": "uint256" },
+      { "name": "", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "aspStarkRootIndex",
+    "inputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
     "stateMutability": "view"
   },
   {
@@ -56,11 +75,40 @@ export const ASP_REGISTRY_HUB_ABI = [
           { "name": "operator", "type": "address", "internalType": "address" },
           { "name": "name", "type": "string", "internalType": "string" },
           { "name": "currentRoot", "type": "uint256", "internalType": "uint256" },
-          { "name": "lastUpdated", "type": "uint256", "internalType": "uint256" }
+          { "name": "lastUpdated", "type": "uint256", "internalType": "uint256" },
+          { "name": "currentStarkRoot", "type": "uint256", "internalType": "uint256" },
+          { "name": "lastStarkUpdated", "type": "uint256", "internalType": "uint256" }
         ]
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getCurrentStarkRoot",
+    "inputs": [{ "name": "aspId", "type": "uint256", "internalType": "uint256" }],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isValidSTARKRoot",
+    "inputs": [
+      { "name": "aspId", "type": "uint256", "internalType": "uint256" },
+      { "name": "root", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [{ "name": "", "type": "bool", "internalType": "bool" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "updateStarkRoot",
+    "inputs": [
+      { "name": "aspId", "type": "uint256", "internalType": "uint256" },
+      { "name": "newRoot", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -116,6 +164,16 @@ export const ASP_REGISTRY_HUB_ABI = [
   {
     "type": "event",
     "name": "ASPRootUpdated",
+    "inputs": [
+      { "name": "aspId", "type": "uint256", "indexed": true, "internalType": "uint256" },
+      { "name": "oldRoot", "type": "uint256", "indexed": false, "internalType": "uint256" },
+      { "name": "newRoot", "type": "uint256", "indexed": false, "internalType": "uint256" }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ASPStarkRootUpdated",
     "inputs": [
       { "name": "aspId", "type": "uint256", "indexed": true, "internalType": "uint256" },
       { "name": "oldRoot", "type": "uint256", "indexed": false, "internalType": "uint256" },

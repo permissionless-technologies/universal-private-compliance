@@ -12,7 +12,11 @@
 import {
   createASPClient,
   MemoryProvider,
+  MerkleTree,
+  PoseidonM31,
+  M31_FIELD_PRIME,
   computeIdentityFromAddress,
+  DEFAULT_TREE_DEPTH,
   type ASPClient,
   type MembershipProof,
 } from '@permissionless-technologies/upc-sdk'
@@ -26,6 +30,21 @@ import {
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { sepolia, foundry } from 'viem/chains'
+
+/**
+ * Map an Ethereum address to a single M31 leaf (`BigInt(addr) % M31_P`).
+ *
+ * This matches the on-chain STARK pool's `addressToM31` reduction — the
+ * `input_origin` column in the Poseidon31 ASP-Merkle path is the
+ * depositor address modular-reduced into M31. The 31-bit truncation
+ * means ~2^15.5 collision security per element; the tree depth + chain
+ * extends beyond, but a collision on `addressToM31` lets two addresses
+ * share an ASP slot. This is an existing soundness limitation of the
+ * M31-origin design, documented in the Track C scope.
+ */
+export function addressToM31Leaf(address: Address): bigint {
+  return BigInt(address) % M31_FIELD_PRIME
+}
 
 export interface ASPManagerConfig {
   rpcUrl: string
@@ -42,12 +61,23 @@ export class ASPManager {
   readonly publicClient: PublicClient
   readonly walletClient: WalletClient
 
+  /**
+   * Parallel STARK-side Merkle tree using Poseidon31 over the same
+   * membership set. Maintained in lock-step with the BLS provider so a
+   * single `addAddress` call updates both trees and the next publish
+   * sends both roots on-chain.
+   */
+  readonly starkTree: MerkleTree
+
   private syncedAddresses = new Set<string>()
+  private starkLeavesByAddress = new Map<string, bigint>()
   private pendingAddresses = new Set<string>()
   private blockedAddresses = new Set<string>()
   private isCatchingUp = true
   private lastPublishedRoot = 0n
+  private lastPublishedStarkRoot = 0n
   private isPublishing = false
+  private isPublishingStark = false
   private publishTimer: ReturnType<typeof setTimeout> | null = null
   private dirty = false
   private readonly PUBLISH_INTERVAL_MS = 30_000 // at most once per 30 seconds
@@ -68,6 +98,13 @@ export class ASPManager {
     })
 
     this.provider = new MemoryProvider()
+
+    // STARK-side parallel tree using Poseidon31 over M31. Output of
+    // `hash2` is a single M31 element matching the on-chain pool's
+    // `pub_asp_root`. LeanIMT with dynamic depth — the in-trace AIR
+    // pads to its fixed `ASP_TREE_DEPTH = 20`; that padding lives in
+    // the SDK's prover wiring (Phase 7), not here.
+    this.starkTree = new MerkleTree(DEFAULT_TREE_DEPTH, new PoseidonM31())
 
     this.client = createASPClient({
       provider: this.provider,
@@ -100,7 +137,9 @@ export class ASPManager {
 
   /**
    * Add an address to the whitelist.
-   * Does NOT publish the root — call schedulePublish() or publishRootIfChanged() separately.
+   * Updates both the BLS-side provider AND the STARK-side parallel
+   * tree. Does NOT publish either root — call schedulePublish() or
+   * publishRootIfChanged() separately.
    *
    * @returns true if the address was new
    */
@@ -111,6 +150,19 @@ export class ASPManager {
 
     const identity = computeIdentityFromAddress(address)
     await this.provider.addMember(identity)
+
+    // Mirror into the STARK tree. Skip if the address's M31 reduction
+    // collides with a previously-added address — duplicate leaves are
+    // rejected by `MerkleTree.insert()` and would also be ambiguous
+    // for proof generation. Collisions are rare (~2^15.5 birthday
+    // bound) but possible at scale; the operator should monitor and
+    // resolve via address-list curation if hit.
+    const starkLeaf = addressToM31Leaf(address)
+    if (!this.starkTree.has(starkLeaf)) {
+      this.starkTree.insert(starkLeaf)
+    }
+    this.starkLeavesByAddress.set(normalized, starkLeaf)
+
     this.syncedAddresses.add(normalized)
     this.pendingAddresses.add(normalized)
     this.dirty = true
@@ -152,33 +204,78 @@ export class ASPManager {
 
   /**
    * Publish the current Merkle root on-chain (if changed).
-   * Serializes publishes — waits for in-flight tx before sending another.
+   *
+   * Publishes BOTH the BLS-side root (for SNARK paths) and the STARK-
+   * side root (for STARK paths). Both are sent if either changed; the
+   * operator is expected to keep them in lock-step so a stale STARK
+   * root can't be used to bypass compliance on STARK paths.
+   *
+   * Serializes per-side publishes — waits for in-flight tx on the same
+   * side before sending another.
+   *
+   * Returns `true` if at least one root was published.
    */
   async publishRootIfChanged(): Promise<boolean> {
+    let publishedAny = false
+
+    // BLS side
     const currentRoot = await this.provider.getRoot()
-    if (currentRoot === this.lastPublishedRoot) return false
-    if (currentRoot === 0n) return false
-
-    // Wait for any in-flight publish to complete
-    if (this.isPublishing) {
-      this.dirty = true // will be picked up by next schedulePublish
-      return false
+    const blsChanged = currentRoot !== this.lastPublishedRoot && currentRoot !== 0n
+    if (blsChanged) {
+      if (this.isPublishing) {
+        this.dirty = true // will be picked up by next schedulePublish
+      } else {
+        this.isPublishing = true
+        try {
+          const hash = await this.client.publishRoot({ walletClient: this.walletClient })
+          this.lastPublishedRoot = currentRoot
+          publishedAny = true
+          console.log(`Published BLS root (${this.syncedAddresses.size} members): ${hash}`)
+        } catch (err) {
+          console.error('Failed to publish BLS root:', err instanceof Error ? err.message : err)
+        } finally {
+          this.isPublishing = false
+        }
+      }
     }
 
-    this.isPublishing = true
-    try {
-      const hash = await this.client.publishRoot({ walletClient: this.walletClient })
-      this.lastPublishedRoot = currentRoot
+    // STARK side — runs independently so a transient failure on one
+    // side doesn't block the other. Lock-step is enforced eventually
+    // because the next schedulePublish() retries any side that lagged.
+    const starkRoot = await this.starkTree.getRoot()
+    const starkChanged =
+      starkRoot !== this.lastPublishedStarkRoot && starkRoot !== 0n
+    if (starkChanged) {
+      if (this.isPublishingStark) {
+        this.dirty = true
+      } else {
+        this.isPublishingStark = true
+        try {
+          const hash = await this.client.publishStarkRoot(starkRoot, {
+            walletClient: this.walletClient,
+          })
+          this.lastPublishedStarkRoot = starkRoot
+          publishedAny = true
+          console.log(
+            `Published STARK root (${this.starkTree.size} leaves): ${hash}`
+          )
+        } catch (err) {
+          console.error(
+            'Failed to publish STARK root:',
+            err instanceof Error ? err.message : err
+          )
+        } finally {
+          this.isPublishingStark = false
+        }
+      }
+    }
+
+    if (publishedAny) {
       this.pendingAddresses.clear()
-      this.dirty = false
-      console.log(`Published root (${this.syncedAddresses.size} members): ${hash}`)
-      return true
-    } catch (err) {
-      console.error('Failed to publish root:', err instanceof Error ? err.message : err)
-      return false
-    } finally {
-      this.isPublishing = false
+      this.dirty = this.isPublishing || this.isPublishingStark
     }
+
+    return publishedAny
   }
 
   /**
@@ -187,6 +284,52 @@ export class ASPManager {
   async getProof(address: Address): Promise<MembershipProof> {
     const identity = computeIdentityFromAddress(address)
     return this.client.generateProof(identity)
+  }
+
+  /**
+   * Current STARK-side Merkle root (Poseidon31, single M31 element).
+   * Returns `0n` until the first member is added.
+   */
+  async getStarkRoot(): Promise<bigint> {
+    return this.starkTree.getRoot()
+  }
+
+  /**
+   * Generate a STARK-side membership proof for an address. Throws if
+   * the address is not in the whitelist.
+   *
+   * The returned `pathElements` and `pathIndices` follow the LeanIMT
+   * convention (dynamic depth = `ceil(log2(memberCount))`). The
+   * in-trace AIR expects fixed `ASP_TREE_DEPTH = 20`; pad to that depth
+   * with zero siblings + zero index_bits before passing to the prover.
+   * (Padding lives in the SDK prover wiring, not here.)
+   */
+  async getStarkProof(address: Address): Promise<{
+    root: bigint
+    leaf: bigint
+    leafIndex: number
+    pathElements: bigint[]
+    pathIndices: number[]
+  }> {
+    const normalized = address.toLowerCase()
+    const leaf = this.starkLeavesByAddress.get(normalized)
+    if (leaf === undefined) {
+      throw new Error(`Address ${address} not in STARK tree`)
+    }
+    const idx = this.starkTree.indexOf(leaf)
+    if (idx < 0) {
+      throw new Error(
+        `STARK leaf for ${address} (${leaf}) is missing from the tree — internal inconsistency`
+      )
+    }
+    const proof = await this.starkTree.getProof(idx)
+    return {
+      root: proof.root,
+      leaf,
+      leafIndex: proof.leafIndex,
+      pathElements: proof.pathElements,
+      pathIndices: proof.pathIndices,
+    }
   }
 
   /**
@@ -226,6 +369,8 @@ export class ASPManager {
       isCatchingUp: this.isCatchingUp,
       aspId: this.client.getASPId()?.toString() ?? null,
       lastPublishedRoot: this.lastPublishedRoot.toString(),
+      lastPublishedStarkRoot: this.lastPublishedStarkRoot.toString(),
+      starkMemberCount: this.starkTree.size,
     }
   }
 

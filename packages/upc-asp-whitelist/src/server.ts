@@ -3,11 +3,13 @@
  *
  * Express server exposing the ASP state:
  *
- *   GET /root              → current Merkle root (public)
- *   GET /proof/:address    → membership proof (rate-limited, public)
- *   GET /status            → global sync status (public)
- *   GET /status/:address   → per-address compliance status (public, rate-limited)
- *   GET /health            → health check (public)
+ *   GET /root                  → current BLS-side Merkle root (public)
+ *   GET /proof/:address        → BLS membership proof (rate-limited, public)
+ *   GET /stark-root            → current STARK-side Merkle root (public)
+ *   GET /stark-proof/:address  → STARK membership proof (rate-limited, public)
+ *   GET /status                → global sync status (public)
+ *   GET /status/:address       → per-address compliance status (public, rate-limited)
+ *   GET /health                → health check (public)
  *
  * The proof endpoint is public because Merkle proofs are not secret — they prove
  * membership in a publicly-committed tree. Callers need proofs for addresses they
@@ -71,6 +73,45 @@ export function createServer(manager: ASPManager, port: number) {
     }
   })
 
+  // Public: current STARK-side Merkle root
+  app.get('/stark-root', async (_req, res) => {
+    try {
+      const root = await manager.getStarkRoot()
+      res.json({ root: root.toString() })
+    } catch (err) {
+      res.status(500).json({ error: String(err) })
+    }
+  })
+
+  // Public + rate-limited: STARK-side membership proof
+  app.get('/stark-proof/:address', rateLimit({ maxRequests: 30, windowSeconds: 60 }), async (req, res) => {
+    const addr = req.params.address
+    if (!addr || !isAddress(addr)) {
+      res.status(400).json({ error: 'Invalid address' })
+      return
+    }
+
+    const checksummed = getAddress(addr) as Address
+
+    if (!manager.isWhitelisted(checksummed)) {
+      res.status(404).json({ error: 'Address not whitelisted' })
+      return
+    }
+
+    try {
+      const proof = await manager.getStarkProof(checksummed)
+      res.json({
+        root: proof.root.toString(),
+        leaf: proof.leaf.toString(),
+        leafIndex: proof.leafIndex,
+        pathElements: proof.pathElements.map(e => e.toString()),
+        pathIndices: proof.pathIndices,
+      })
+    } catch (err) {
+      res.status(500).json({ error: String(err) })
+    }
+  })
+
   // Public + rate-limited: per-address compliance status
   app.get('/status/:address', rateLimit({ maxRequests: 20, windowSeconds: 60 }), (req, res) => {
     const addr = req.params.address
@@ -98,10 +139,12 @@ export function createServer(manager: ASPManager, port: number) {
 
   app.listen(port, () => {
     console.log(`ASP API server listening on http://localhost:${port}`)
-    console.log(`  GET /root              → current Merkle root`)
-    console.log(`  GET /proof/:addr       → membership proof (rate-limited)`)
-    console.log(`  GET /status            → global sync status`)
-    console.log(`  GET /status/:addr      → per-address status (rate-limited)`)
+    console.log(`  GET /root                  → current BLS Merkle root`)
+    console.log(`  GET /proof/:addr           → BLS membership proof (rate-limited)`)
+    console.log(`  GET /stark-root            → current STARK Merkle root`)
+    console.log(`  GET /stark-proof/:addr     → STARK membership proof (rate-limited)`)
+    console.log(`  GET /status                → global sync status`)
+    console.log(`  GET /status/:addr          → per-address status (rate-limited)`)
   })
 
   return app

@@ -9,6 +9,17 @@
 export type { IHashFunction } from './core/hash/interface.js'
 export { PoseidonBN254, BN254_FIELD_PRIME } from './core/hash/poseidon-bn254.js'
 export { PoseidonBLS12381, BLS12_381_FIELD_PRIME } from './core/hash/poseidon-bls.js'
+export { PoseidonM31, M31_FIELD_PRIME } from './core/hash/poseidon-m31.js'
+export {
+  hashM31,
+  hashTwo,
+  computeOwnerHash,
+  computeCommitment,
+  computeNullifier,
+  verifyMerklePath,
+  POSEIDON31_DIGEST_SIZE,
+  POSEIDON31_SECRET_LIMBS,
+} from './core/hash/index.js'
 export { getDefaultHashFunction } from './core/hash/index.js'
 
 // Core
