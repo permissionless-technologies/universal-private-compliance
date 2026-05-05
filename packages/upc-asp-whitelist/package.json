@@ -2,6 +2,11 @@
   "name": "@permissionless-technologies/upc-asp-whitelist",
   "version": "0.7.2",
   "description": "Auto-whitelist ASP service — watches on-chain events and automatically whitelists addresses after sanctions screening",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/permissionless-technologies/universal-private-compliance.git",
+    "directory": "packages/upc-asp-whitelist"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
