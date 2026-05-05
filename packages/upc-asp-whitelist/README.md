@@ -11,15 +11,31 @@ npm install @permissionless-technologies/upc-asp-whitelist
 ```
 
 ```typescript
-import { startASPService } from '@permissionless-technologies/upc-asp-whitelist'
+import {
+  startASPService,
+  RpcEventSource,
+  SanctionsGate,
+} from '@permissionless-technologies/upc-asp-whitelist'
+import { parseAbiItem } from 'viem'
+
+const shieldedEvent = parseAbiItem(
+  'event Shielded(address indexed token, address indexed depositor, bytes32 indexed commitment, uint256 leafIndex, bytes encryptedNote)'
+)
 
 await startASPService({
   rpcUrl: 'http://localhost:8545',
   registryAddress: '0x...',       // ASPRegistryHub contract
-  watchAddress: '0x...',          // Pool or token address
-  watchMode: 'pool',             // 'pool' or 'mint'
   operatorPrivateKey: '0x...',
   port: 3001,
+
+  eventSource: new RpcEventSource({
+    rpcUrl: 'http://localhost:8545',
+    watchAddress: '0x...',         // Pool or token address
+    event: shieldedEvent,
+    addressTopicIndex: 2,
+  }),
+
+  gate: new SanctionsGate({ blocklist: [] }),
 })
 ```
 
@@ -37,7 +53,7 @@ CMD ["npx", "tsx", "index.ts"]
 ```json
 {
   "dependencies": {
-    "@permissionless-technologies/upc-asp-whitelist": "^0.1.0"
+    "@permissionless-technologies/upc-asp-whitelist": "^0.7.0"
   }
 }
 ```
