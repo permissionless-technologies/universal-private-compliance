@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-sdk-v0.5.0...upc-sdk-v0.5.1) (2026-05-05)
+
+
+### Bug Fixes
+
+* **asp-whitelist:** correct stale API endpoints in README ([775d3fb](https://github.com/permissionless-technologies/universal-private-compliance/commit/775d3fb247f88b2dbb59a88ebb7318212b1b420f))
+
 ## [0.5.0](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-sdk-v0.4.2...upc-sdk-v0.5.0) (2026-05-05)
 
 
