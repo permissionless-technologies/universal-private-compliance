@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.2](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-sdk-v0.5.1...upc-sdk-v0.5.2) (2026-05-05)
+
+
+### Bug Fixes
+
+* **asp-whitelist:** update README Quick Start to current composable API ([3a3dccf](https://github.com/permissionless-technologies/universal-private-compliance/commit/3a3dccf0aa316e91513cd34cb216b8a01e8ed475))
+* include root in workspaces so children can symlink upc-sdk ([7aace83](https://github.com/permissionless-technologies/universal-private-compliance/commit/7aace83be26eb26a89ad0fb3d1bce40c1dcd9871))
+
 ## [0.5.1](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-sdk-v0.5.0...upc-sdk-v0.5.1) (2026-05-05)
 
 

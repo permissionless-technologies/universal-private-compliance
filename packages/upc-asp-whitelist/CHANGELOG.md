@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.2](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-asp-whitelist-v0.7.1...upc-asp-whitelist-v0.7.2) (2026-05-05)
+
+
+### Bug Fixes
+
+* **asp-whitelist:** update README Quick Start to current composable API ([3a3dccf](https://github.com/permissionless-technologies/universal-private-compliance/commit/3a3dccf0aa316e91513cd34cb216b8a01e8ed475))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @permissionless-technologies/upc-sdk bumped from ^0.5.1 to ^0.5.2
+
 ## [0.7.1](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-asp-whitelist-v0.7.0...upc-asp-whitelist-v0.7.1) (2026-05-05)
 
 
