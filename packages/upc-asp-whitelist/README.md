@@ -46,10 +46,13 @@ CMD ["npx", "tsx", "index.ts"]
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /root` | Current Merkle root |
-| `GET /proof/:address` | Membership proof |
-| `GET /members` | All whitelisted addresses |
-| `GET /status` | Sync status |
+| `GET /root` | Current SNARK-side Merkle root (Poseidon over BLS12-381) |
+| `GET /proof/:address` | SNARK-side membership proof |
+| `GET /stark-root` | Current STARK-side Merkle root (Poseidon31) |
+| `GET /stark-proof/:address` | STARK-side membership proof |
+| `GET /status` | Service sync status |
+| `GET /status/:address` | Per-address whitelist status |
+| `GET /health` | Liveness probe |
 
 ## Part of the UPC Ecosystem
 
