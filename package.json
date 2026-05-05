@@ -3,6 +3,7 @@
   "version": "0.5.1",
   "description": "Universal Private Compliance SDK — Pluggable zero-knowledge attestation & ASP (Association Set Provider) framework",
   "workspaces": [
+    ".",
     "packages/*"
   ],
   "type": "module",
