@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-asp-whitelist-v0.6.0...upc-asp-whitelist-v0.7.0) (2026-05-05)
+
+
+### Features
+
+* **asp:** dual-root ASP service — parallel Poseidon31 tree (Track C Phase 4) ([dc27f88](https://github.com/permissionless-technologies/universal-private-compliance/commit/dc27f88cb3e4eec72f4e4fc6432af8d9ae3c3371))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @permissionless-technologies/upc-sdk bumped from ^0.3.2 to ^0.5.0
+
 ## [0.6.0](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-asp-whitelist-v0.5.1...upc-asp-whitelist-v0.6.0) (2026-04-09)
 
 

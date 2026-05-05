@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-sdk-v0.4.2...upc-sdk-v0.5.0) (2026-05-05)
+
+
+### Features
+
+* **asp:** dual-root ASP service — parallel Poseidon31 tree (Track C Phase 4) ([dc27f88](https://github.com/permissionless-technologies/universal-private-compliance/commit/dc27f88cb3e4eec72f4e4fc6432af8d9ae3c3371))
+* **hash:** add Poseidon2-Mersenne31 implementation (Track C Phase 4) ([2f9ac0d](https://github.com/permissionless-technologies/universal-private-compliance/commit/2f9ac0d9d0d71d7c204671a68f8c542656b79eee))
+
 ## [0.4.2](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-sdk-v0.4.1...upc-sdk-v0.4.2) (2026-04-10)
 
 
