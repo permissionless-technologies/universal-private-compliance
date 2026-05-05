@@ -60,6 +60,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Build upc-sdk first (DTS resolution for the workspace dep)
+        run: npm run build
       - run: npm run build
         working-directory: packages/upc-asp-whitelist
       - name: Publish with provenance
