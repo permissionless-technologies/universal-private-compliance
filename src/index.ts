@@ -31,6 +31,11 @@ export {
   computeMerkleRoot,
   verifyMembershipProof,
 } from './core/proof.js'
+
+// Transitional compatibility shim — see the helper's docstring before
+// using. Not a substitute for an always-hash STARK-side tree model.
+export { padLeanIMTProofToDepth } from './core/proof.js'
+export type { AIRShapeProof } from './core/proof.js'
 export {
   computeIdentityFromBabyJubJub,
   computeIdentityFromAddress,

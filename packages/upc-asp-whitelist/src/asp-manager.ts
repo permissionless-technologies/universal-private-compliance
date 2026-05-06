@@ -100,10 +100,21 @@ export class ASPManager {
     this.provider = new MemoryProvider()
 
     // STARK-side parallel tree using Poseidon31 over M31. Output of
-    // `hash2` is a single M31 element matching the on-chain pool's
-    // `pub_asp_root`. LeanIMT with dynamic depth — the in-trace AIR
-    // pads to its fixed `ASP_TREE_DEPTH = 20`; that padding lives in
-    // the SDK's prover wiring (Phase 7), not here.
+    // `hash2` is a single M31 element. LeanIMT with dynamic depth —
+    // the in-trace AIR is fixed at `ASP_TREE_DEPTH = 20` and uses
+    // always-hash semantics (no zero-sibling propagation). LeanIMT
+    // proofs from this tree pass through `padLeanIMTProofToDepth`
+    // (in `@permissionless-technologies/upc-sdk`) before reaching
+    // the prover, which closes the per-proof divergence.
+    //
+    // **Known protocol gap (Phase 7 follow-up):** in a sparsely-
+    // populated tree (`leafCount` not a power of two) different
+    // leaves' AIR-shape roots disagree, so this LeanIMT view cannot
+    // back a single `pub_asp_root` shared by every member. Closing
+    // that requires building the tree itself under always-hash
+    // semantics (an `AlwaysHashMerkleTree` class with precomputed
+    // zero-subtree roots `ZSR(k)`). Tracked alongside the SDK +
+    // zkdemo wiring step.
     this.starkTree = new MerkleTree(DEFAULT_TREE_DEPTH, new PoseidonM31())
 
     this.client = createASPClient({
@@ -300,9 +311,16 @@ export class ASPManager {
    *
    * The returned `pathElements` and `pathIndices` follow the LeanIMT
    * convention (dynamic depth = `ceil(log2(memberCount))`). The
-   * in-trace AIR expects fixed `ASP_TREE_DEPTH = 20`; pad to that depth
-   * with zero siblings + zero index_bits before passing to the prover.
-   * (Padding lives in the SDK prover wiring, not here.)
+   * in-trace AIR expects fixed `ASP_TREE_DEPTH = 20` with always-hash
+   * semantics (no zero-sibling propagation). Consumers must pass the
+   * LeanIMT proof through
+   * `padLeanIMTProofToDepth(leaf, pathElements, pathIndices, 20)`
+   * from `@permissionless-technologies/upc-sdk` before feeding it to
+   * the prover; that helper strips LeanIMT propagation levels, replays
+   * survivors through always-hash, and zero-pads up to 20 levels. The
+   * helper's `root` field is the AIR-shape root (which differs from
+   * the LeanIMT root whenever propagation kicked in) and is what the
+   * pool's `pub_asp_root` will see on-chain.
    */
   async getStarkProof(address: Address): Promise<{
     root: bigint
