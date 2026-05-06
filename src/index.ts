@@ -24,6 +24,17 @@ export { getDefaultHashFunction } from './core/hash/index.js'
 
 // Core
 export { MerkleTree, buildMerkleTree, verifyMerkleProof, DEFAULT_TREE_DEPTH, MAX_TREE_DEPTH } from './core/tree.js'
+
+// Always-hash tree — STARK-side canonical tree model. Cross-leaf root
+// agreement holds by construction; this is what the asp-whitelist's
+// STARK-side tree uses to back a single shared `pub_asp_root`.
+export {
+  AlwaysHashMerkleTree,
+  buildAlwaysHashMerkleTree,
+  DEFAULT_ALWAYS_HASH_DEPTH,
+  MAX_ALWAYS_HASH_DEPTH,
+} from './core/always-hash-tree.js'
+export type { AlwaysHashMerkleProof } from './core/always-hash-tree.js'
 export {
   generateMembershipProof,
   generateSingleMemberProof,

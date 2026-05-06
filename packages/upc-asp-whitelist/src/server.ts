@@ -104,8 +104,13 @@ export function createServer(manager: ASPManager, port: number) {
         root: proof.root.toString(),
         leaf: proof.leaf.toString(),
         leafIndex: proof.leafIndex,
+        depth: proof.depth,
+        // pathIndices are bigint (0n | 1n) under the AlwaysHashMerkleTree
+        // model. They're guaranteed to be 0 or 1, so emit them as
+        // numbers on the wire for consumer convenience and JSON
+        // compatibility (BigInt has no native JSON serialization).
         pathElements: proof.pathElements.map(e => e.toString()),
-        pathIndices: proof.pathIndices,
+        pathIndices: proof.pathIndices.map(i => Number(i)),
       })
     } catch (err) {
       res.status(500).json({ error: String(err) })

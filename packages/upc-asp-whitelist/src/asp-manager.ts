@@ -12,11 +12,11 @@
 import {
   createASPClient,
   MemoryProvider,
-  MerkleTree,
+  AlwaysHashMerkleTree,
   PoseidonM31,
   M31_FIELD_PRIME,
   computeIdentityFromAddress,
-  DEFAULT_TREE_DEPTH,
+  DEFAULT_ALWAYS_HASH_DEPTH,
   type ASPClient,
   type MembershipProof,
 } from '@permissionless-technologies/upc-sdk'
@@ -65,9 +65,12 @@ export class ASPManager {
    * Parallel STARK-side Merkle tree using Poseidon31 over the same
    * membership set. Maintained in lock-step with the BLS provider so a
    * single `addAddress` call updates both trees and the next publish
-   * sends both roots on-chain.
+   * sends both roots on-chain. Built under always-hash semantics
+   * (fixed `ASP_TREE_DEPTH = 20`, no LeanIMT propagation) so every
+   * member's depth-20 proof verifies against this tree's single root —
+   * the on-chain `pub_asp_root` the Poseidon31 STARK AIR consumes.
    */
-  readonly starkTree: MerkleTree
+  readonly starkTree: AlwaysHashMerkleTree
 
   private syncedAddresses = new Set<string>()
   private starkLeavesByAddress = new Map<string, bigint>()
@@ -99,23 +102,19 @@ export class ASPManager {
 
     this.provider = new MemoryProvider()
 
-    // STARK-side parallel tree using Poseidon31 over M31. Output of
-    // `hash2` is a single M31 element. LeanIMT with dynamic depth —
-    // the in-trace AIR is fixed at `ASP_TREE_DEPTH = 20` and uses
-    // always-hash semantics (no zero-sibling propagation). LeanIMT
-    // proofs from this tree pass through `padLeanIMTProofToDepth`
-    // (in `@permissionless-technologies/upc-sdk`) before reaching
-    // the prover, which closes the per-proof divergence.
-    //
-    // **Known protocol gap (Phase 7 follow-up):** in a sparsely-
-    // populated tree (`leafCount` not a power of two) different
-    // leaves' AIR-shape roots disagree, so this LeanIMT view cannot
-    // back a single `pub_asp_root` shared by every member. Closing
-    // that requires building the tree itself under always-hash
-    // semantics (an `AlwaysHashMerkleTree` class with precomputed
-    // zero-subtree roots `ZSR(k)`). Tracked alongside the SDK +
-    // zkdemo wiring step.
-    this.starkTree = new MerkleTree(DEFAULT_TREE_DEPTH, new PoseidonM31())
+    // STARK-side parallel tree using Poseidon31 over M31, built under
+    // always-hash semantics at fixed depth 20 — every internal node
+    // hashes its two children regardless, with empty subtrees
+    // represented by precomputed `ZSR(k)`. This is the canonical
+    // STARK-side tree model: every member's depth-20 proof verifies
+    // against the same root, so the published `pub_asp_root` is
+    // coherent across the entire membership set. Replaces an earlier
+    // LeanIMT view that diverged on per-leaf AIR-shape roots in
+    // sparsely-populated trees.
+    this.starkTree = new AlwaysHashMerkleTree(
+      DEFAULT_ALWAYS_HASH_DEPTH,
+      new PoseidonM31()
+    )
 
     this.client = createASPClient({
       provider: this.provider,
@@ -253,9 +252,14 @@ export class ASPManager {
     // STARK side — runs independently so a transient failure on one
     // side doesn't block the other. Lock-step is enforced eventually
     // because the next schedulePublish() retries any side that lagged.
+    //
+    // Note on the empty-tree guard: under the always-hash model, an
+    // empty tree's root is `ZSR(20)` (a deterministic non-zero value),
+    // *not* `0n`. Skip publishing while there are no members by
+    // checking `starkTree.size` instead of comparing the root to zero.
     const starkRoot = await this.starkTree.getRoot()
     const starkChanged =
-      starkRoot !== this.lastPublishedStarkRoot && starkRoot !== 0n
+      this.starkTree.size > 0 && starkRoot !== this.lastPublishedStarkRoot
     if (starkChanged) {
       if (this.isPublishingStark) {
         this.dirty = true
@@ -309,25 +313,22 @@ export class ASPManager {
    * Generate a STARK-side membership proof for an address. Throws if
    * the address is not in the whitelist.
    *
-   * The returned `pathElements` and `pathIndices` follow the LeanIMT
-   * convention (dynamic depth = `ceil(log2(memberCount))`). The
-   * in-trace AIR expects fixed `ASP_TREE_DEPTH = 20` with always-hash
-   * semantics (no zero-sibling propagation). Consumers must pass the
-   * LeanIMT proof through
-   * `padLeanIMTProofToDepth(leaf, pathElements, pathIndices, 20)`
-   * from `@permissionless-technologies/upc-sdk` before feeding it to
-   * the prover; that helper strips LeanIMT propagation levels, replays
-   * survivors through always-hash, and zero-pads up to 20 levels. The
-   * helper's `root` field is the AIR-shape root (which differs from
-   * the LeanIMT root whenever propagation kicked in) and is what the
-   * pool's `pub_asp_root` will see on-chain.
+   * The returned `pathElements` and `pathIndices` are already in the
+   * shape the in-trace Poseidon31 ASP-Merkle AIR consumes: fixed
+   * depth (`ASP_TREE_DEPTH = 20`), always-hash semantics, and
+   * `pathIndices` as `bigint[]` so the result feeds directly into
+   * `verifyMerklePath` from `@permissionless-technologies/upc-sdk`
+   * without conversion. `root` is the same value
+   * `getStarkRoot()` returns and the pool's `pub_asp_root` will see
+   * on-chain.
    */
   async getStarkProof(address: Address): Promise<{
     root: bigint
     leaf: bigint
     leafIndex: number
+    depth: number
     pathElements: bigint[]
-    pathIndices: number[]
+    pathIndices: bigint[]
   }> {
     const normalized = address.toLowerCase()
     const leaf = this.starkLeavesByAddress.get(normalized)
@@ -345,6 +346,7 @@ export class ASPManager {
       root: proof.root,
       leaf,
       leafIndex: proof.leafIndex,
+      depth: proof.depth,
       pathElements: proof.pathElements,
       pathIndices: proof.pathIndices,
     }
