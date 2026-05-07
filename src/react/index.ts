@@ -17,3 +17,6 @@ export type { UseASPMembershipConfig, UseASPMembershipReturn, ASPMembershipStatu
 
 export { useASPProof } from './use-asp-proof.js'
 export type { UseASPProofConfig, UseASPProofReturn, ASPProofData } from './use-asp-proof.js'
+
+export { useStarkASPProof } from './use-stark-asp-proof.js'
+export type { UseStarkASPProofConfig, UseStarkASPProofReturn, StarkASPProofData } from './use-stark-asp-proof.js'
