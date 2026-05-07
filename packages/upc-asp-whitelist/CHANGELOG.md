@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.8.0](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-asp-whitelist-v0.7.3...upc-asp-whitelist-v0.8.0) (2026-05-07)
+
+
+### Features
+
+* **core:** add padLeanIMTProofToDepth + pin the LeanIMT/AIR mismatch ([3a7ec8b](https://github.com/permissionless-technologies/universal-private-compliance/commit/3a7ec8bd283f175b29f202396320c6d16e11bc32))
+* **core:** always-hash merkle tree + switch asp-whitelist stark tree to it ([fb375df](https://github.com/permissionless-technologies/universal-private-compliance/commit/fb375df3fee70629307d4cd6c65271792f2df325))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @permissionless-technologies/upc-sdk bumped from ^0.5.3 to ^0.6.0
+
 ## [0.7.3](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-asp-whitelist-v0.7.2...upc-asp-whitelist-v0.7.3) (2026-05-05)
 
 
