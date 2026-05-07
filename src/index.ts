@@ -82,11 +82,17 @@ export type {
   MembershipGateStats,
   ASPRootResponse,
   ASPProofResponse,
+  ASPStarkRootResponse,
+  ASPStarkProofResponse,
   ASPAddressStatus,
   ASPAddressStatusResponse,
   ASPStatusResponse,
   ASPErrorResponse,
 } from './asp/index.js'
+
+// ASP Fetch Helpers — STARK side (BLS side: fetchASPProof from ./core/asp-list)
+export { fetchStarkASPRoot, fetchStarkASPProof } from './asp/index.js'
+export type { ASPStarkProofData } from './asp/index.js'
 
 // ASP EIP-712 & Signature Helpers
 export {

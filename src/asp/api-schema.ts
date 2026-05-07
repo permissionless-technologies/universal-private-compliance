@@ -40,6 +40,44 @@ export interface ASPProofResponse {
 }
 
 /**
+ * Response for GET /stark-root
+ *
+ * Distinct from ASPRootResponse — the STARK side uses an always-hash
+ * fixed-depth tree (AlwaysHashMerkleTree), so its root is a different
+ * value from the SNARK-side LeanIMT root over the same membership set.
+ * Kept as its own type so callers can't silently substitute one for
+ * the other.
+ */
+export interface ASPStarkRootResponse {
+  /** Current STARK-side Merkle root (decimal string, M31 field) */
+  root: string
+}
+
+/**
+ * Response for GET /stark-proof/:address
+ *
+ * Always-hash, fixed-depth proof. Verifies against the same value
+ * GET /stark-root returns, for every member in the tree (cross-leaf
+ * root agreement). pathIndices on the wire are JSON numbers (0 or 1)
+ * — the underlying tree uses bigint indices but they're guaranteed
+ * binary, and JSON has no native BigInt encoding.
+ */
+export interface ASPStarkProofResponse {
+  /** Tree root (decimal string, M31 field) */
+  root: string
+  /** Leaf value the proof is for (decimal string, M31-encoded address) */
+  leaf: string
+  /** Index of the leaf in insertion order (0-based) */
+  leafIndex: number
+  /** Tree depth — fixed across every proof in this tree */
+  depth: number
+  /** Sibling at each level (decimal strings, length === depth) */
+  pathElements: string[]
+  /** Side bit at each level (0 = current is left, 1 = right; length === depth) */
+  pathIndices: number[]
+}
+
+/**
  * Per-address compliance status.
  */
 export type ASPAddressStatus = 'whitelisted' | 'pending' | 'blocked' | 'unknown'

@@ -15,11 +15,17 @@ export type { IMembershipGate, MembershipGateStats } from './membership-gate.js'
 export type {
   ASPRootResponse,
   ASPProofResponse,
+  ASPStarkRootResponse,
+  ASPStarkProofResponse,
   ASPAddressStatus,
   ASPAddressStatusResponse,
   ASPStatusResponse,
   ASPErrorResponse,
 } from './api-schema.js'
+
+// Fetch Helpers — Plain (non-React) async helpers for STARK endpoints
+export { fetchStarkASPRoot, fetchStarkASPProof } from './fetch-helpers.js'
+export type { ASPStarkProofData } from './fetch-helpers.js'
 
 // EIP-712 — Signature constants for gated endpoints
 export {
