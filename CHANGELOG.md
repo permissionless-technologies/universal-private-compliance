@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.3](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-sdk-v0.5.2...upc-sdk-v0.5.3) (2026-05-05)
+
+
+### Bug Fixes
+
+* **asp-whitelist:** declare repository for npm provenance verification ([2e5c0a1](https://github.com/permissionless-technologies/universal-private-compliance/commit/2e5c0a1b273f1d9be7dfa08133fa337109ef4517))
+
 ## [0.5.2](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-sdk-v0.5.1...upc-sdk-v0.5.2) (2026-05-05)
 
 
