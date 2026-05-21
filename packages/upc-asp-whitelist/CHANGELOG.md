@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.0](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-asp-whitelist-v0.8.0...upc-asp-whitelist-v0.9.0) (2026-05-21)
+
+
+### Features
+
+* **asp-whitelist:** plumb Subsquid API key for v2 archive auth ([3cbc0cf](https://github.com/permissionless-technologies/universal-private-compliance/commit/3cbc0cf6e1cfe07caa6cd7c7751e6efd8dcb9e39))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @permissionless-technologies/upc-sdk bumped from ^0.6.0 to ^0.7.0
+
 ## [0.8.0](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-asp-whitelist-v0.7.3...upc-asp-whitelist-v0.8.0) (2026-05-07)
 
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-sdk-v0.6.0...upc-sdk-v0.7.0) (2026-05-21)
+
+
+### Features
+
+* **asp-whitelist:** plumb Subsquid API key for v2 archive auth ([3cbc0cf](https://github.com/permissionless-technologies/universal-private-compliance/commit/3cbc0cf6e1cfe07caa6cd7c7751e6efd8dcb9e39))
+* **asp:** stark-side fetch helpers + wire-format types ([382dae6](https://github.com/permissionless-technologies/universal-private-compliance/commit/382dae66539791172bfc30730b3f6cbd3abb29f2))
+* **react:** useStarkASPProof hook ([8f85870](https://github.com/permissionless-technologies/universal-private-compliance/commit/8f85870f809d6a28eaf22e2c58d20b1c428c1a6c))
+
+
+### Tests
+
+* **asp:** live non-ragequit smoke against asp-whitelist.upd.io ([c8f1896](https://github.com/permissionless-technologies/universal-private-compliance/commit/c8f1896510968a13e7dbc049dd011822bf7654fd))
+
 ## [0.6.0](https://github.com/permissionless-technologies/universal-private-compliance/compare/upc-sdk-v0.5.3...upc-sdk-v0.6.0) (2026-05-07)
 
 
