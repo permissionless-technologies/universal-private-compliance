@@ -3,6 +3,18 @@ name: Release Please
 on:
   push:
     branches: [main]
+  # Manual recovery hatch. The publish gates below extend their condition to
+  # `github.event_name == 'workflow_dispatch'`, so triggering this workflow
+  # by hand republishes whatever versions are currently in package.json
+  # against npm (against `main` HEAD, via the `ref: main` checkout below).
+  #
+  # When to use: a release-please PR merged + tagged, but the publish job
+  # subsequently failed (e.g. stale lockfile, npm registry blip). Push a
+  # fix to main, then `gh workflow run release-please.yml --ref main`.
+  # Re-running the original failed workflow does NOT work for this case
+  # because `gh run rerun` reuses the original commit's workflow file,
+  # which won't have any subsequent fixes.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -28,7 +40,10 @@ jobs:
 
   publish-sdk:
     needs: release-please
-    if: ${{ needs.release-please.outputs.root_release_created == 'true' }}
+    # `workflow_dispatch` is the manual recovery path (see `on:` comment).
+    # On normal pushes the release-please action gates this strictly via
+    # `root_release_created`.
+    if: ${{ needs.release-please.outputs.root_release_created == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
@@ -56,7 +71,8 @@ jobs:
 
   publish-asp-whitelist:
     needs: release-please
-    if: ${{ needs.release-please.outputs.whitelist_release_created == 'true' }}
+    # Same recovery-hatch rationale as publish-sdk.
+    if: ${{ needs.release-please.outputs.whitelist_release_created == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
