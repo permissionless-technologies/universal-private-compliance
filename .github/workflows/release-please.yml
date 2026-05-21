@@ -35,7 +35,16 @@ jobs:
       contents: read
       id-token: write
     steps:
+      # Check out `main` HEAD rather than the event SHA. The publish jobs
+      # need whatever lockfile / package.json state is on main RIGHT NOW,
+      # not the SHA that originally triggered the workflow. This matters
+      # for re-runs: when a publish fails (e.g. on a stale lockfile that's
+      # since been fixed on main), `gh run rerun --failed` would otherwise
+      # check out the same broken SHA and fail again. Pinning to `main`
+      # ensures a re-run picks up forward fixes.
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -54,7 +63,11 @@ jobs:
       contents: read
       id-token: write
     steps:
+      # See `publish-sdk` checkout comment — same rationale for re-run
+      # safety.
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/setup-node@v4
         with:
           node-version: 24
