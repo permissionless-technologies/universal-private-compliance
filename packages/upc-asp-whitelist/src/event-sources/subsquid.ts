@@ -14,6 +14,22 @@ import type { IEventSource, EventSourceStatus } from '@permissionless-technologi
 export interface SubsquidEventSourceConfig {
   /** Subsquid archive URL */
   archive: string
+  /**
+   * Subsquid API key. Required as of mid-2026 — Subsquid gated the v2 archive
+   * endpoints (`v2.archive.subsquid.io/network/...`) behind authenticated
+   * requests; missing keys produce 401s and silent indexing stalls.
+   *
+   * Get one at https://app.subsquid.io and pass it here, or set the
+   * `SQD_API_KEY` environment variable to let the Subsquid SDK pick it up
+   * automatically (Subsquid's documented default per
+   * @subsquid/evm-processor@1.30.x `GatewaySettings.apiKey`).
+   *
+   * If you leave this unset on a Subsquid-gated network, the processor will
+   * log auth failures on every catch-up batch and never make progress.
+   * Service operators should read their preferred env var name (e.g.
+   * `SQD_KEY`) and pass it through explicitly.
+   */
+  apiKey?: string
   /** RPC endpoint (for live blocks after catch-up) */
   rpcUrl: string
   /** Contract address to watch (undefined = all) */
@@ -39,17 +55,38 @@ export class SubsquidEventSource implements IEventSource {
 
   async start(onAddress: (address: `0x${string}`) => Promise<void>): Promise<void> {
     const {
-      archive, rpcUrl, watchAddress, event, addressTopicIndex,
+      archive, apiKey, rpcUrl, watchAddress, event, addressTopicIndex,
       deployBlock = 0n, finalityConfirmation = 10,
     } = this.config
+
+    // Subsquid gated the v2 archive endpoints behind API keys; running without
+    // one against a gated network produces opaque 401s every catch-up batch
+    // and the indexer silently stalls. Surface the situation loud and early
+    // so operators see the cause in CloudWatch / kubectl logs before they
+    // start hunting for "missing blocks" symptoms downstream (root not
+    // publishing, members not whitelisting, etc.).
+    if (!apiKey && !process.env.SQD_API_KEY) {
+      console.warn(
+        '[Subsquid] No API key configured (neither `apiKey` config field nor ' +
+          '`SQD_API_KEY` env var). Subsquid v2 archive endpoints are gated; ' +
+          'requests will return 401 and the processor will retry forever ' +
+          'without making progress. Set an API key from https://app.subsquid.io.',
+      )
+    }
 
     const topicHash = toEventSelector(event)
 
     // Dynamic import — subsquid is an optional dependency
     const { EvmBatchProcessor } = await import('@subsquid/evm-processor')
 
+    // `setGateway` accepts `string | GatewaySettings`. With an apiKey we MUST
+    // use the object form; the string form has no place to inject auth and
+    // the Subsquid SDK silently sends unauthenticated requests in that case.
+    // Passing `apiKey: undefined` is safe — Subsquid's `GatewaySettings.apiKey`
+    // is optional and the SDK falls back to `SQD_API_KEY` from the env when
+    // unset.
     const processor = new EvmBatchProcessor()
-      .setGateway(archive)
+      .setGateway({ url: archive, apiKey })
       .setRpcEndpoint(rpcUrl)
       .setFinalityConfirmation(finalityConfirmation)
       .setBlockRange({ from: Number(deployBlock) })
